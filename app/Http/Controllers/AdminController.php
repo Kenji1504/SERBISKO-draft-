@@ -53,15 +53,24 @@ class AdminController extends Controller
         $electiveCounts = [];
 
         foreach ($electives as $elective) {
+            // Map acronym to full Google Form string
+            $fullMap = [
+                'STEM'    => 'Science, Technology, Engineering, and Mathematics (STEM)',
+                'BE'      => 'Business and Entrepreneurship (BE)',
+                'ASSH'    => 'Arts, Social Sciences, and Humanities (ASSH)',
+                'TechPro' => 'Technical-Vocational-Livelihood (TVL)'
+            ];
+            $fullString = $fullMap[$elective] ?? $elective;
+
             $electiveCounts[$elective] = $applyFilter(DB::table('students')
                 ->join('pre_enrollments', 'students.lrn', '=', 'pre_enrollments.student_lrn')
                 ->leftJoin('kiosk_enrollments', 'students.lrn', '=', 'kiosk_enrollments.student_lrn')
-                ->where(function($q) use ($elective) {
-                    $lowerElective = strtolower($elective);
-                    $q->where('kiosk_enrollments.cluster', $elective)
-                    ->orWhere(function($sub) use ($lowerElective) {
+                ->where(function($q) use ($elective, $fullString) {
+                    $q->where('kiosk_enrollments.cluster', $elective) // Check short name in Kiosk
+                    ->orWhere(function($sub) use ($fullString) {
                         $sub->whereNull('kiosk_enrollments.cluster')
-                            ->whereRaw('LOWER(pre_enrollments.responses) LIKE ?', ['%"Cluster":"' . $lowerElective . '"%']);
+                            // Use the CORRECT key "Cluster of Electives" and the FULL string
+                            ->where('pre_enrollments.responses', 'like', '%"Cluster of Electives":"' . $fullString . '"%');
                     });
                 }))
                 ->count();
@@ -144,17 +153,33 @@ class AdminController extends Controller
             'student_type' => ['kiosk' => 'kiosk_enrollments.academic_status', 'json' => 'Academic Status'],
             'grade_level'  => ['kiosk' => 'kiosk_enrollments.grade_level',     'json' => 'Grade Level to Enroll'],
             'track'        => ['kiosk' => 'kiosk_enrollments.track',           'json' => 'Track'],
-            'cluster'      => ['kiosk' => 'kiosk_enrollments.cluster',         'json' => 'Strand/Specialization']
+            'cluster'      => ['kiosk' => 'kiosk_enrollments.cluster',         'json' => 'Cluster of Electives'] // Fixed this key
+        ];
+
+        // Define the mapping for search
+        $fullClusterNames = [
+            'STEM'    => 'Science, Technology, Engineering, and Mathematics (STEM)',
+            'BE'      => 'Business and Entrepreneurship (BE)',
+            'ASSH'    => 'Arts, Social Sciences, and Humanities (ASSH)',
+            'TechPro' => 'TechPro'
         ];
 
         foreach ($filters as $requestKey => $keys) {
             if ($request->filled($requestKey)) {
                 $val = $request->$requestKey;
-                $query->where(function($q) use ($keys, $val) {
-                    $q->where($keys['kiosk'], '=', $val)
-                    ->orWhere(function($sq) use ($keys, $val) {
+
+                $query->where(function($q) use ($keys, $val, $requestKey, $fullClusterNames) {
+                    // 1. Always check the Kiosk column for the short value (e.g., 'BE')
+                    $q->where($keys['kiosk'], '=', $val);
+
+                    // 2. Check the JSON column for the FULL string if it's a Cluster filter
+                    $q->orWhere(function($sq) use ($keys, $val, $requestKey, $fullClusterNames) {
+                        $searchString = ($requestKey === 'cluster' && isset($fullClusterNames[$val])) 
+                            ? $fullClusterNames[$val] 
+                            : $val;
+
                         $sq->whereNull($keys['kiosk'])
-                            ->where('pre_enrollments.responses', 'like', '%"' . $keys['json'] . '":"' . $val . '"%');
+                        ->where('pre_enrollments.responses', 'like', '%"' . $keys['json'] . '":"' . $searchString . '"%');
                     });
                 });
             }
@@ -176,16 +201,31 @@ class AdminController extends Controller
             default: $query->orderBy('users.last_name', 'asc'); break;
         }
 
+        // AdminController.php -> students() method
         $students = $query->get()->map(function($student) {
             $raw = json_decode($student->responses, true) ?? [];
             $details = [];
             foreach ($raw as $key => $value) $details[trim($key)] = $value;
 
-            $student->display_type    = $student->kiosk_status ?? ($details['Academic Status'] ?? '—');
-            $student->display_grade   = $student->kiosk_grade  ?? ($details['Grade Level to Enroll'] ?? '—');
-            $student->display_track   = $student->kiosk_track  ?? ($details['Track'] ?? '—');
-            $student->display_cluster = $student->kiosk_cluster ?? $student->kiosk_strand ?? ($details['Strand/Specialization'] ?? '—');
+            // Acronym Map for Table Display
+            $acronyms = [
+                'Science, Technology, Engineering, and Mathematics (STEM)' => 'STEM',
+                'Business and Entrepreneurship (BE)' => 'BE',
+                'Arts, Social Sciences, and Humanities (ASSH)' => 'ASSH',
+                'Technical-Vocational-Livelihood (TVL)' => 'TechPro'
+            ];
 
+            $jsonCluster = $details['Cluster of Electives'] ?? '—';
+
+            // Apply Logic: Kiosk > (Acronym if JSON) > Dash
+            $student->display_grade   = $student->kiosk_grade   ?? ($details['Grade Level to Enroll'] ?? '—');
+            $student->display_track   = $student->kiosk_track   ?? ($details['Track'] ?? '—');
+            $student->display_status  = $student->kiosk_status  ?? ($details['Academic Status'] ?? '—');
+            
+            // Only convert to acronym here for the table
+            $student->display_cluster = $student->kiosk_cluster ?? ($acronyms[$jsonCluster] ?? $jsonCluster);
+
+            // Enrollment category logic
             if (!empty($student->kiosk_grade)) {
                 $student->enrollment_category = 'Document Verified';
                 $student->status_style = 'bg-[#00923F] text-white border-green-200';
@@ -243,7 +283,7 @@ class AdminController extends Controller
     // 4. SYNC AND UTILITY LOGIC (From Thesis/Backup)
     public function systemsync()
     {
-        $history = DB::table('sync_histories')->orderBy('created_at', 'desc')->get();
+        $syncHistory = DB::table('sync_histories')->orderBy('created_at', 'desc')->get();
         $lastSync = DB::table('sync_histories')->where('status', 'Success')->latest()->first();
 
         $isConnected = false;
@@ -262,7 +302,7 @@ class AdminController extends Controller
 
         $formUrl = "https://forms.gle/7wrtrGWf2nDCWcz9A";
 
-        return view('admin.systemsync', compact('history', 'lastSync', 'formUrl', 'isConnected'));
+        return view('admin.systemsync', compact('syncHistory', 'lastSync', 'formUrl', 'isConnected'));
     }
 
     public function verification(){ return view('admin.verification'); }
@@ -270,8 +310,9 @@ class AdminController extends Controller
     public function accountsettings(){ return view('admin.accountsettings'); }
 
     public function performSync() {
-        // Keeps your exact Google Sheets Sync logic intact here
-        set_time_limit(120);
+        // Increase time to 5 minutes to handle 1,000 rows synchronously
+        set_time_limit(300); 
+        
         $spreadsheetId = '1pUdqUbAMQEZ4Kg2V6A05orHY9xnDCJLp2QWLQaXXmSk'; 
         $range = 'Form_Responses2!A1:ZZ'; 
 
@@ -290,20 +331,17 @@ class AdminController extends Controller
 
             $headers = $values[0];
             $dataRows = array_slice($values, 1);
-
             $newCount = 0;
             $updatedCount = 0;
 
             foreach ($dataRows as $row) { 
                 $row = array_pad($row, count($headers), null);
                 if (empty(array_filter($row))) continue; 
-                if (empty(trim($row[1])) || empty(trim($row[2])) || empty(trim($row[3])) || empty(trim($row[6]))) continue; 
+                if (empty(trim($row[1] ?? '')) || empty(trim($row[2] ?? '')) || empty(trim($row[3] ?? '')) || empty(trim($row[6] ?? ''))) continue; 
 
                 try {
                     $formattedDob = Carbon::parse($row[6])->format('Y-m-d');
-                } catch (\Exception $e) {
-                    continue; 
-                }
+                } catch (\Exception $e) { continue; }
 
                 $lrn = trim($row[1]);
 
@@ -311,30 +349,27 @@ class AdminController extends Controller
                     $existingStudent = DB::table('students')->where('lrn', $lrn)->first();
                     $userId = $existingStudent ? $existingStudent->user_id : null;
 
+                    // Dynamic JSON Responses (Field 41 onwards)
                     $dynamicResponses = [];
                     for ($i = 41; $i < count($headers); $i++) {
                         $question = $headers[$i] ?? "Field " . $i;
                         $dynamicResponses[$question] = $row[$i] ?? null;
                     }
                     $newJson = json_encode($dynamicResponses);
+                    
                     $hasChanged = false;
-
                     if ($existingStudent) {
                         $existingUser = DB::table('users')->where('id', $userId)->first();
                         $existingEnrollment = DB::table('pre_enrollments')->where('student_lrn', $lrn)->first();
 
                         if (
-                            ($existingUser && $existingUser->first_name !== trim($row[3])) ||
                             ($existingUser && $existingUser->last_name !== trim($row[2])) ||
-                            ($existingUser && $existingUser->birthday !== $formattedDob) ||
-                            $existingStudent->sex !== ($row[9] ?? null) || 
-                            $existingStudent->age !== (is_numeric($row[8]) ? (int)$row[8] : null) ||
+                            ($existingStudent && $existingStudent->sex !== ($row[9] ?? null)) ||
                             ($existingEnrollment && $existingEnrollment->responses !== $newJson)
-                        ) {
-                            $hasChanged = true;
-                        }
+                        ) { $hasChanged = true; }
                     }
 
+                    // 1. Update/Insert User
                     if ($userId) {
                         DB::table('users')->where('id', $userId)->update([
                             'last_name'  => trim($row[2]),
@@ -356,6 +391,7 @@ class AdminController extends Controller
                         ]);
                     }
 
+                    // 2. Update/Insert Student (ALL YOUR FIELDS)
                     DB::table('students')->updateOrInsert(
                         ['lrn' => $lrn],
                         [
@@ -363,11 +399,39 @@ class AdminController extends Controller
                             'extension_name'       => $row[5] ?? null,
                             'sex'                  => $row[9] ?? null,
                             'age'                  => is_numeric($row[8]) ? (int)$row[8] : null,
+                            'place_of_birth'       => $row[7] ?? null,
+                            'mother_tongue'        => $row[10] ?? null,
+                            'curr_house_number'    => $row[11] ?? null,
+                            'curr_street'          => $row[12] ?? null,
+                            'curr_barangay'        => $row[13] ?? null,
+                            'curr_city'            => $row[14] ?? null,
+                            'curr_province'        => $row[15] ?? null,
+                            'curr_zip_code'        => $row[17] ?? null,
+                            'is_perm_same_as_curr' => (isset($row[19]) && $row[19] == 'Yes') ? 1 : 0,
+                            'perm_house_number'    => $row[20] ?? null,
+                            'perm_street'          => $row[21] ?? null,
+                            'perm_barangay'        => $row[22] ?? null,
+                            'perm_city'            => $row[23] ?? null,
+                            'perm_province'        => $row[24] ?? null,
+                            'perm_zip_code'        => $row[26] ?? null,
+                            'father_last_name'     => $row[29] ?? null,
+                            'father_first_name'    => $row[30] ?? null,
+                            'father_middle_name'   => $row[31] ?? null,
+                            'father_contact_number'=> $row[32] ?? null,
+                            'mother_last_name'     => $row[33] ?? null,
+                            'mother_first_name'    => $row[34] ?? null,
+                            'mother_middle_name'   => $row[35] ?? null,
+                            'mother_contact_number'=> $row[36] ?? null,
+                            'guardian_last_name'   => $row[37] ?? null,
+                            'guardian_first_name'  => $row[38] ?? null,
+                            'guardian_middle_name' => $row[39] ?? null,
+                            'guardian_contact_number' => $row[40] ?? null,
                             'updated_at'           => ($hasChanged || !$existingStudent) ? now() : DB::raw('updated_at'),
                             'created_at'           => $existingStudent ? DB::raw('created_at') : now(), 
                         ]
                     );
 
+                    // 3. Update Pre-Enrollment
                     DB::table('pre_enrollments')->updateOrInsert(
                         ['student_lrn' => $lrn],
                         [

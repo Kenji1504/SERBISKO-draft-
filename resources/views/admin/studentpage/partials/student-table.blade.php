@@ -41,7 +41,7 @@
                     <tr class="hover:bg-gray-100 transition-colors">
                         <td class="py-3 px-4 text-left text-[11px] text-gray-600 font-medium">{{ $student->lrn }}</td>
                         <td class="py-3 px-4 text-left text-[11px] text-[#003918] font-bold uppercase truncate">{{ $fullName }}</td>
-                        <td class="py-3 px-4 text-left text-[11px] text-gray-600 font-medium">{{ $student->display_type }}</td>
+                        <td class="py-3 px-4 text-left text-[11px] text-gray-600 font-medium">{{ $student->display_status }}</td>
                         <td class="py-3 px-4 text-center text-[11px] text-gray-600">{{ $student->display_grade }}</td>
                         <td class="py-3 px-4 text-left text-[11px] text-gray-600 truncate">{{ $student->display_track }}</td>
                         <td class="py-3 px-4 text-left text-[11px] text-gray-600 truncate">{{ $student->display_cluster }}</td>

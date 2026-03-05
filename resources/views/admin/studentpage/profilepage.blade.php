@@ -71,7 +71,7 @@
                 'School Year:' => $details['School Year'] ?? '—',
                 'Grade Level:' => $finalGrade,    
                 'Track:'       => $finalTrack,   
-                'Elective:'    => $finalCluster,  
+                'Cluster of Electives:'    => $finalCluster,  
                 'Status:'      => $finalStatus    
             ], 'grid-cols-1') !!}
         </div>
