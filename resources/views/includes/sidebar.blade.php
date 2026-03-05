@@ -42,16 +42,18 @@
                     </a>
                 </li>
 
-                <li>
-                    <a href="{{ route('admin.students') }}" class="flex items-center gap-10 px-4 py-3 text-[#003918] font-semibold rounded-xl hover:bg-[#00923F]/5 transition-colors group {{ isActive(route: 'admin.students') }}">
-                        <div class="w-6 flex justify-center shrink-0">
-                            <svg class="w-6 h-6 fill-current opacity-80 group-hover:opacity-100" viewBox="0 0 24 24">
-                                <path d="M12 12c1.87 0 3.57.62 4.8 1.48c1.18.83 2.18 2.05 2.18 3.37c0 .72-.3 1.32-.8 1.77c-.45.42-1.05.7-1.67.88c-1.23.37-2.85.5-4.53.5s-3.3-.13-4.53-.5c-.62-.18-1.21-.46-1.67-.88c-.5-.45-.8-1.05-.8-1.77c0-1.32 1-2.54 2.18-3.37c1.24-.86 2.94-1.48 4.81-1.48m0-9a4 4 0 1 1 0 8a4 4 0 0 1 0-8"/>
-                            </svg>
-                        </div>
-                        <span>Students</span>
-                    </a>
-                </li>
+                <ul class="space-y-1.5 list-none p-0">
+                    <li class="rounded-xl transition-colors group {{ request()->is('admin/students*') ? 'bg-[#00923F]/10 text-[#00923F] border-l-4 border-[#00923F]' : 'text-[#003918] hover:bg-[#00923F]/5' }}">
+                        <a href="{{ route('admin.students') }}" class="flex items-center gap-10 px-4 py-3 font-semibold">
+                            <div class="w-6 flex justify-center shrink-0">
+                                <svg class="w-5 h-5 fill-current opacity-80 group-hover:opacity-100" viewBox="0 0 20 20">
+                                    <path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"/>
+                                </svg>
+                            </div>
+                            <span>Students</span>
+                        </a>
+                    </li>
+                </ul>
 
                 <li>
                     <a href="{{ route('admin.verification') }}" class="flex items-center gap-10 px-4 py-3 text-[#003918] font-semibold rounded-xl hover:bg-[#00923F]/5 transition-colors group {{ isActive(route: 'admin.verification') }}">
@@ -82,7 +84,7 @@
                                 <path d="M15.0127 5V1.25L10.0127 6.25L15.0127 11.25V7.5C19.1502 7.5 22.5127 10.8625 22.5127 15C22.5127 16.2625 22.2002 17.4625 21.6377 18.5L23.4627 20.325C24.4755 18.7336 25.0132 16.8863 25.0127 15C25.0127 9.475 20.5377 5 15.0127 5ZM15.0127 22.5C10.8752 22.5 7.5127 19.1375 7.5127 15C7.5127 13.7375 7.8252 12.5375 8.3877 11.5L6.5627 9.675C5.54989 11.2664 5.01217 13.1137 5.0127 15C5.0127 20.525 9.48769 25 15.0127 25V28.75L20.0127 23.75L15.0127 18.75V22.5Z" />
                             </svg>
                         </div>
-                        <span class="text-lg">System Sync</span>
+                        <span class="leading-tight">System Sync</span>
                     </a>
                 </li>
             </ul>

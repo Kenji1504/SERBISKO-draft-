@@ -29,7 +29,9 @@ Route::middleware([CheckAdmin::class])->group(function () {
     Route::get('/dashboard', [AdminController::class, 'index'])->name('admin.dashboard');
 
     Route::prefix('admin')->name('admin.')->group(function () {
+        Route::get('/dashboard', [AdminController::class, 'index'])->name('dashboard');
         Route::get('/students', [AdminController::class, 'students'])->name('students');
+        Route::get('/students/profile/{lrn}', [AdminController::class, 'profilepage'])->name('studentpage.profilepage'); // Merged from backup
         Route::get('/systemsync', [AdminController::class, 'systemsync'])->name('systemsync');
         Route::get('/verification', [AdminController::class, 'verification'])->name('verification');
         Route::get('/requirementhub', [AdminController::class, 'requirementhub'])->name('requirementhub');

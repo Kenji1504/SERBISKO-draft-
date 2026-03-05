@@ -5,6 +5,10 @@
         </h1>
     </div>
 
+    <div class="flex-1 flex justify-end px-6">
+        @yield('header_content')
+    </div>
+
     <div class="flex items-center gap-8">
         <button class="text-[#00923F] p-2 hover:bg-[#00923F]/5 rounded-full transition-colors relative">
             <svg class="w-9 h-9 fill-current" viewBox="0 0 24 24">

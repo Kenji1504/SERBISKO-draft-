@@ -19,19 +19,27 @@
         },
       }
     </script>
+
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    
 </head>
-<body class="bg-[#F6FFFA] flex min-h-screen overflow-hidden">
+
+<body class="bg-white flex h-screen overflow-hidden font-sans">
 
     @include('includes.sidebar')
 
-    <main class="flex-1 bg-[#FFFFFF] shadow-2xl flex flex-col relative">
+    <div class="flex-1 flex flex-col min-w-0 bg-white shadow-2xl overflow-hidden">
         
         @include('includes.header')
 
-        <div class="px-16 flex-1 overflow-y-auto">
-            @yield('content')
-        </div>
-        
-    </main>
+        <main class="px-16 flex-1 overflow-y-auto bg-white">
+              <div class="max-w-[1600px] mx-auto">
+                  @yield('content')
+              </div>
+        </main>
+    </div>
 </body>
+
 </html>
