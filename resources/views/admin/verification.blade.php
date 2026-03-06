@@ -1,13 +1,9 @@
 @extends('admin.layout')
 
-@section('title', 'Manual Verification | Admin')
+@section('page_title', 'Manual Verification Queue')
 
 @section('content')
 <div class="px-6 py-8 w-full max-w-7xl mx-auto">
-    <div class="flex justify-between items-center mb-6">
-        <h1 class="text-3xl font-bold text-gray-800">Manual Verification Queue</h1>
-    </div>
-
     @if(session('success'))
     <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4" id="success-message">
         {{ session('success') }}

@@ -495,12 +495,15 @@ class AdminController extends Controller
                 });
             }
 
+            $now = Carbon::now('Asia/Manila');
+
             DB::table('sync_histories')->insert([
-                'records_synced' => $newCount + $updatedCount,
-                'new_records' => $newCount,
-                'updated_records' => $updatedCount,
-                'status' => 'Success',
-                'created_at' => now()
+                'records_synced'  => ($newCount + $updatedCount),
+                'new_records'     => $newCount,      // Now matches the SQL change above
+                'updated_records' => $updatedCount,  // Now matches the SQL change above
+                'status'          => 'Success',
+                'created_at'      => $now,
+                'updated_at'      => $now,
             ]);
 
             return back()->with('success', "Sync Complete! $newCount new and $updatedCount updated.");
