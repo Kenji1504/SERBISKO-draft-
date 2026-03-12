@@ -13,16 +13,32 @@ class AuthController extends Controller
 {
     public function login(Request $request)
     {
-        // 1. Get inputs
+        // 1. Backend Validation
+        // This triggers the @error messages in your Blade template
+        $request->validate([
+            'last_name' => 'required|string',
+            'given_name' => 'required|string',
+            'dob' => 'required|date',
+            'password' => 'required',
+            // Middle name is excluded because it is optional
+        ], [
+            // Custom messages to match your specific wording requirements
+            'last_name.required' => 'Required.',
+            'given_name.required' => 'Required.',
+            'dob.required' => 'Required.',
+            'password.required' => 'Required.',
+        ]);
+
+        // 2. Get inputs (Only runs if validation passes)
         $lastName = $request->input('last_name');
         $givenName = $request->input('given_name');
         $middleName = $request->input('middle_name');
         $dob = $request->input('dob');
         $password = $request->input('password');
 
-        // 2. Find user using Eloquent (Required for Auth::login)
+        // 3. Find user using Eloquent
         $query = User::where('last_name', $lastName)
-            ->where('first_name', $givenName)
+            ->where('first_name', $givenName) // Note: Ensure your DB column is first_name
             ->where('birthday', $dob)
             ->whereNull('deleted_at');
 
@@ -36,21 +52,16 @@ class AuthController extends Controller
 
         $user = $query->first();
 
-        // 3. Authenticate
+        // 4. Authenticate
         if ($user && Hash::check($password, $user->password)) {
-            
-            // CRITICAL: Log the user into Laravel's Auth system
-            // This is what makes auth()->user() work in your header
             Auth::login($user);
 
             $role = strtolower($user->role); 
 
-            // Save manual keys for your CheckAdmin middleware
             Session::put('user_id', $user->id);
             Session::put('user_role', $role); 
             Session::put('user_name', $user->first_name);
 
-            // 4. Redirect based on Role
             if (in_array($role, ['admin', 'super_admin', 'facilitator'])) {
                 return redirect('/dashboard'); 
             } else {
@@ -58,7 +69,8 @@ class AuthController extends Controller
             }
         }
 
-        return back()->withErrors(['message' => 'Invalid credentials. Please check your details.']);
+        // If database check fails, return the general error message
+        return back()->withErrors(['message' => 'Invalid credentials. Please check your details.'])->withInput();
     }
 
     public function logout(Request $request)

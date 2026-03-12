@@ -8,30 +8,12 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
-        body {
-            font-family: 'Google Sans', sans-serif;
-        }
-
-        [x-cloak] { 
-            display: none !important;
-        }
-         
-        /* Replicating the specific gradient from your image */
-        .custom-gradient {
-            background: linear-gradient(90deg, #1b5e20 0%, #2e7d32 40%, #f3f4f6 100%);
-        }
-        /* Custom date input icon positioning */
+        body { font-family: 'Google Sans', sans-serif; }
+        [x-cloak] { display: none !important; }
+        .custom-gradient { background: linear-gradient(90deg, #1b5e20 0%, #2e7d32 40%, #f3f4f6 100%); }
         input[type="date"]::-webkit-calendar-picker-indicator {
-            background: transparent;
-            bottom: 0;
-            color: transparent;
-            cursor: pointer;
-            height: auto;
-            left: 0;
-            position: absolute;
-            right: 0;
-            top: 0;
-            width: auto;
+            background: transparent; bottom: 0; color: transparent; cursor: pointer;
+            height: auto; left: 0; position: absolute; right: 0; top: 0; width: auto;
         }
     </style>
 </head>
@@ -47,16 +29,10 @@
         
         <div class="text-white space-y-2">
             <p class="text-lg md:text-xl font-medium opacity-90">Ready to join TNCHS Senior High?</p>
-            <h1 class="text-5xl md:text-7xl font-bold tracking-tight">
-                Welcome to SerbIsko
-            </h1>
-            <p class="text-2xl md:text-3xl font-light opacity-90">
-                — your enrollment buddy!
-            </p>
-            
+            <h1 class="text-5xl md:text-7xl font-bold tracking-tight">Welcome to SerbIsko</h1>
+            <p class="text-2xl md:text-3xl font-light opacity-90">— your enrollment buddy!</p>
             <p class="pt-8 text-sm md:text-base opacity-80 max-w-md leading-relaxed">
-                Submit your documents here to complete your enrollment.
-                <br>It's quick, easy, and secure!
+                Submit your documents here to complete your enrollment. <br>It's quick, easy, and secure!
             </p>
         </div>
 
@@ -64,41 +40,71 @@
             <h2 class="text-4xl font-bold text-blue-900 mb-8">Sign in to get started</h2>
 
             @if($errors->has('message'))
-                <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded-r-xl shadow-sm animate-pulse">
+                <div class="bg-red-100 border-l-4 border-red-700 text-red-700 p-4 mb-6 rounded-r-xl shadow-sm animate-pulse">
                     <p class="font-bold text-sm">Access Denied</p>
                     <p class="text-xs">{{ $errors->first('message') }}</p>
                 </div>
             @endif
 
-            <form action="{{ url('/login') }}" method="POST" class="space-y-5">
+            <form action="{{ url('/login') }}" method="POST" class="space-y-5"
+                x-data="{ 
+                    errors: {
+                        last_name: {{ $errors->has('last_name') ? 'true' : 'false' }},
+                        given_name: {{ $errors->has('given_name') ? 'true' : 'false' }},
+                        dob: {{ $errors->has('dob') ? 'true' : 'false' }},
+                        password: {{ $errors->has('password') ? 'true' : 'false' }}
+                    } 
+                }">
                 @csrf
 
                 <div class="grid grid-cols-3 gap-3">
                     <div class="flex flex-col">
-                        <label class="text-xs font-bold text-gray-700 mb-1 ml-1">Last Name</label>
-                        <input type="text" name="last_name" placeholder="Last Name" 
-                               class="w-full px-4 py-3 rounded-xl border-2 border-green-700/30 bg-white/50 focus:bg-white focus:ring-2 focus:ring-green-600 focus:border-transparent outline-none transition-all placeholder-gray-400">
+                        <label class="text-xs font-bold text-gray-700 mb-1 ml-1 flex justify-between items-center">
+                            <span>Last Name</span>
+                            <template x-if="errors.last_name">
+                                <span class="text-red-700 italic text-[10px]">Required.</span>
+                            </template>
+                        </label>
+                        <input type="text" name="last_name" value="{{ old('last_name') }}" placeholder="Last Name" 
+                               @input="errors.last_name = false"
+                               :class="errors.last_name ? 'border-red-700' : 'border-green-700/30'"
+                               class="w-full px-4 py-3 rounded-xl border-2 transition-all bg-white/50 focus:bg-white outline-none">
                     </div>
+
                     <div class="flex flex-col">
-                        <label class="text-xs font-bold text-gray-700 mb-1 ml-1">Given Name</label>
-                        <input type="text" name="given_name" placeholder="Given Name" 
-                               class="w-full px-4 py-3 rounded-xl border-2 border-green-700/30 bg-white/50 focus:bg-white focus:ring-2 focus:ring-green-600 focus:border-transparent outline-none transition-all placeholder-gray-400">
+                        <label class="text-xs font-bold text-gray-700 mb-1 ml-1 flex justify-between items-center">
+                            <span>Given Name</span>
+                            <template x-if="errors.given_name">
+                                <span class="text-red-700 italic text-[10px]">Required.</span>
+                            </template>
+                        </label>
+                        <input type="text" name="given_name" value="{{ old('given_name') }}" placeholder="Given Name" 
+                               @input="errors.given_name = false"
+                               :class="errors.given_name ? 'border-red-700' : 'border-green-700/30'"
+                               class="w-full px-4 py-3 rounded-xl border-2 transition-all bg-white/50 focus:bg-white outline-none">
                     </div>
+
                     <div class="flex flex-col">
                         <label class="text-xs font-bold text-gray-700 mb-1 ml-1">
-                            Middle Name <span class="text-gray-700 font-normal italic lowercase">(if applicable)</span>
+                            Middle Name <span class="text-gray-400 font-normal italic lowercase">(optional)</span>
                         </label>
-                        
-                        <input type="text" name="middle_name" placeholder="Middle Name" 
-                            class="w-full px-4 py-3 rounded-xl border-2 border-green-700/30 bg-white/50 focus:bg-white focus:ring-2 focus:ring-green-600 focus:border-transparent outline-none transition-all placeholder-gray-400">
+                        <input type="text" name="middle_name" value="{{ old('middle_name') }}" placeholder="Middle Name" 
+                               class="w-full px-4 py-3 rounded-xl border-2 border-green-700/30 bg-white/50 focus:bg-white outline-none transition-all placeholder-gray-400">
                     </div>
                 </div>
 
                 <div class="flex flex-col relative">
-                    <label class="text-xs font-bold text-gray-700 mb-1 ml-1">Date of Birth</label>
+                    <label class="text-xs font-bold text-gray-700 mb-1 ml-1 flex justify-between items-center">
+                        <span>Date of Birth</span>
+                        <template x-if="errors.dob">
+                            <span class="text-red-700 italic text-[10px]">Required.</span>
+                        </template>
+                    </label>
                     <div class="relative">
-                        <input type="date" name="dob" 
-                               class="w-full px-4 py-3 rounded-xl border-2 border-green-700/30 bg-white/50 focus:bg-white focus:ring-2 focus:ring-green-600 focus:border-transparent outline-none transition-all text-gray-600 placeholder-gray-400 appearance-none">
+                        <input type="date" name="dob" value="{{ old('dob') }}"
+                               @change="errors.dob = false"
+                               :class="errors.dob ? 'border-red-700' : 'border-green-700/30'"
+                               class="w-full px-4 py-3 rounded-xl border-2 transition-all bg-white/50 focus:bg-white outline-none text-gray-600 appearance-none">
                         <div class="absolute right-4 top-1/2 transform -translate-y-1/2 pointer-events-none">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-blue-900" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -108,23 +114,23 @@
                 </div>
 
                 <div class="flex flex-col" x-data="{ show: false }">
-                    <label class="text-xs font-bold text-gray-700 mb-1 ml-1">Password</label>
-                    
+                    <label class="text-xs font-bold text-gray-700 mb-1 ml-1 flex justify-between items-center">
+                        <span>Password</span>
+                        <template x-if="errors.password">
+                            <span class="text-red-700 italic text-[10px]">Required.</span>
+                        </template>
+                    </label>
                     <div class="relative">
-                        <input :type="show ? 'text' : 'password'" 
-                            name="password" 
-                            placeholder="Your Password" 
-                            class="w-full px-4 py-3 rounded-xl border-2 border-green-700/30 bg-white/50 focus:bg-white focus:ring-2 focus:ring-green-600 focus:border-transparent outline-none transition-all placeholder-gray-400 pr-12">
+                        <input :type="show ? 'text' : 'password'" name="password" placeholder="Your Password" 
+                               @input="errors.password = false"
+                               :class="errors.password ? 'border-red-700' : 'border-green-700/30'"
+                               class="w-full px-4 py-3 rounded-xl border-2 transition-all bg-white/50 focus:bg-white outline-none pr-12">
                         
-                        <button type="button" 
-                                @click="show = !show" 
-                                class="absolute inset-y-0 right-0 pr-4 flex items-center text-blue-900 hover:text-blue-900 transition-colors">
-                            
+                        <button type="button" @click="show = !show" class="absolute inset-y-0 right-0 pr-4 flex items-center text-blue-900 transition-colors">
                             <svg x-show="!show" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                             </svg>
-                            
                             <svg x-show="show" x-cloak class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.542-7a10.025 10.025 0 014.132-5.403m5.417-1.071A10.05 10.05 0 0112 5c4.478 0 8.268 2.943 9.542 7a10.025 10.025 0 01-4.132 5.403m-5.417 1.071L17.25 17.25M3.75 3.75l16.5 16.5" />
                             </svg>
@@ -133,15 +139,12 @@
                 </div>
 
                 <div class="pt-4">
-                    <button type="submit" 
-                            class="w-full bg-blue-900 hover:bg-blue-800 text-white font-bold text-lg py-4 rounded-full shadow-lg transform transition hover:-translate-y-0.5 hover:shadow-xl">
+                    <button type="submit" class="w-full bg-blue-900 hover:bg-blue-800 text-white font-bold text-lg py-4 rounded-full shadow-lg transform transition hover:-translate-y-0.5">
                         Sign In
                     </button>
                 </div>
-
             </form>
         </div>
     </div>
-
 </body>
 </html>
