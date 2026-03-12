@@ -38,12 +38,15 @@
                         </div>
                     </td>
                     <td class="px-10 py-4">
-                        <div x-data="{ isOnline: {{ \Illuminate\Support\Facades\Cache::has('user-is-online-' . $user->id) ? 'true' : 'false' }} }" 
+                        <div class="flex justify-center items-center" 
+                            x-data="{ isOnline: {{ \Illuminate\Support\Facades\Cache::has('user-is-online-' . $user->id) ? 'true' : 'false' }} }" 
                             x-init="setInterval(() => { 
                                 fetch('/admin/check-user-status/{{ $user->id }}')
                                     .then(res => res.json())
                                     .then(data => isOnline = data.online) 
-                            }, 10000)"> <template x-if="isOnline">
+                            }, 10000)"> 
+                            
+                            <template x-if="isOnline">
                                 <span class="flex items-center gap-1.5 text-[10px] font-bold text-green-600 uppercase">
                                     <span class="w-1.5 h-1.5 rounded-full bg-green-600 animate-pulse"></span>
                                     Online

@@ -371,7 +371,7 @@ class AdminController extends Controller
     }
 
     public function requirementhub(){ return view('admin.requirementhub');}
-    public function accountsettings(){ return view('admin.accountsettings'); }
+    public function accountsettings(){ return view('admin.account_settings.accountsettings'); }
 
     // 6. ACCESS MANAGEMENT LOGIC
     public function accessManagement(Request $request)

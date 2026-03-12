@@ -11,29 +11,40 @@ class CheckAdmin
 {
     public function handle(Request $request, Closure $next)
     {
-        // If the user is already on the page we redirect to, don't check session!
-        if ($request->is('/') || $request->is('login')) {
+        // 1. Skip checks for public routes
+        if ($request->is('/') || $request->is('login') || $request->is('logout')) {
             return $next($request);
         }
-        $userId = Session::get('user_id');
-        $userRole = Session::get('user_role');
 
-        // 1. Updated session check to include super_admin
-        if (!$userId || !in_array($userRole, ['admin', 'super_admin'])) {
-            return redirect('/')->withErrors(['message' => 'Unauthorized access.']);
+        $userId = Session::get('user_id');
+        $userRole = strtolower(Session::get('user_role')); // Normalize to lowercase
+
+        // 2. Auth Check
+        if (!$userId) {
+            return redirect('/')->withErrors(['message' => 'Please login first.']);
         }
 
-        // 2. Real-time Database Check (The "Kill Switch")
-        $user = DB::table('users')
-                    ->where('id', $userId)
-                    ->whereNull('deleted_at')
-                    ->first();
+        // 3. Path-Based Permission Check
+        if ($request->is('student/*') || $request->is('api/*')) {
+            // Students, Admins, and Facilitators can all access the kiosk
+            if (!in_array($userRole, ['student', 'admin', 'super_admin', 'facilitator'])) {
+                return redirect('/')->withErrors(['message' => 'Unauthorized student access.']);
+            }
+        } else {
+            // STRICT: Only Staff can access non-student routes (Dashboard, etc.)
+            if (!in_array($userRole, ['admin', 'super_admin', 'facilitator'])) {
+                // If a student tries to go to /dashboard, send them back to the kiosk
+                return redirect('/student/grade-selection')->withErrors(['message' => 'Access Denied.']);
+            }
+        }
 
+        // 4. The "Kill Switch"
+        $user = DB::table('users')->where('id', $userId)->whereNull('deleted_at')->first();
         if (!$user) {
             Session::flush();
             return redirect('/')->withErrors(['message' => 'Your access has been revoked.']);
         }
 
         return $next($request);
-    }
+    }   
 }

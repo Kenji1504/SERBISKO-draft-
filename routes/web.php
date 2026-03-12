@@ -13,14 +13,10 @@ use Illuminate\Support\Facades\DB;
 | Public Routes
 |--------------------------------------------------------------------------
 */
-
-// Change it to this:
-Route::get('/', function () {
-    return view('login');
-})->name('login');
+Route::get('/', function () {return view('login');})->name('home');
+Route::get('/login', function () {return view('login');})->name('login');
 Route::post('/login', [AuthController::class, 'login']);
-Route::get('/logout', [AuthController::class, 'logout']);
-
+Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 /*
 |--------------------------------------------------------------------------
 | ADMIN ROUTES (Protected via CheckAdmin)
