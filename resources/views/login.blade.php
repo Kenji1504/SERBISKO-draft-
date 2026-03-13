@@ -41,7 +41,7 @@
 
             @if($errors->has('message'))
                 <div class="bg-red-100 border-l-4 border-red-700 text-red-700 p-4 mb-6 rounded-r-xl shadow-sm">
-                    <p class="font-bold text-sm">Access Denied</p>
+                    <p class="font-bold text-sm">Access Denied / Session Expired</p>
                     <p class="text-xs">{{ $errors->first('message') }}</p>
                 </div>
             @endif
@@ -83,7 +83,7 @@
 
                     <div class="flex flex-col">
                         <label class="text-xs font-bold text-gray-700 mb-1 ml-1">
-                            Middle Name <span class="text-gray-400 font-normal italic lowercase">(optional)</span>
+                            Middle Name <span class="text-gray-700 font-normal italic lowercase">(if applicable)</span>
                         </label>
 
                         <input type="text" name="middle_name" value="{{ old('middle_name') }}" 

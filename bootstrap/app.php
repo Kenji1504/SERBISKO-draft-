@@ -23,7 +23,11 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        //
+        $exceptions->render(function (\Illuminate\Session\TokenMismatchException $e, $request) {
+            return redirect()->back()
+                ->withInput($request->except('password'))
+                ->withErrors(['message' => 'Session refreshed. Please try signing in again.']);
+        });
     })->create();
 
     

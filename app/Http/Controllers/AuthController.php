@@ -60,7 +60,7 @@ class AuthController extends Controller
 
             // Generic error for all other identity failures
             return back()->withErrors([
-                'message' => 'Access Denied. The information provided does not match our records.'
+                'message' => 'The information provided does not match our records.'
             ])->withInput($request->except('password'));
         }
 
