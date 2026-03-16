@@ -75,11 +75,11 @@ def control_door(action=None):
         action = data.get('action', 'open') # Default to open if frontend doesn't specify
         
     if action.lower() == 'open':
-        send_command('R')
-        return jsonify({'status': 'success', 'command': 'R', 'message': 'Slot opened'})
+        send_command('r')
+        return jsonify({'status': 'success', 'command': 'r', 'message': 'Slot opened'})
     elif action.lower() == 'close':
-        send_command('F')
-        return jsonify({'status': 'success', 'command': 'F', 'message': 'Slot closed'})
+        send_command('f')
+        return jsonify({'status': 'success', 'command': 'f', 'message': 'Slot closed'})
         
     return jsonify({'error': 'Invalid slot action'}), 400
 
@@ -88,15 +88,15 @@ def control_door(action=None):
 # ==========================================
 @app.route('/api/conveyor/start', methods=['POST'])
 def start_conveyor():
-    send_command('C0')
+    send_command('c0')
     
     def conveyor_timer():
         time.sleep(6)
-        send_command('C1')
-        print("🛑 Conveyor Auto-Stopped (C1 triggered).")
+        send_command('c1')
+        print("🛑 Conveyor Auto-Stopped (c1 triggered).")
         
     threading.Thread(target=conveyor_timer).start()
-    return jsonify({'status': 'success', 'command': 'C0', 'message': 'Conveyor started. Will auto-stop in 6s.'})
+    return jsonify({'status': 'success', 'command': 'c0', 'message': 'Conveyor started. Will auto-stop in 6s.'})
 
 @app.route('/api/conveyor/w', methods=['POST'])
 def trigger_w():
@@ -108,16 +108,16 @@ def trigger_w():
 # ==========================================
 @app.route('/api/strand/<cluster>', methods=['POST'])
 def select_bin(cluster):
-    # Mapping based on your Tray ID screenshot (UPPERCASE for safety)
+    # Mapping based on your Tray ID screenshot (lowercase as requested)
     cluster_map = {
-        'ASSH': 'B1',
-        'BE': 'B2',
-        'STEM': 'B3',
-        'CSS': 'B4',
-        'DIGITAL': 'B4',   
-        'EIM': 'B5',
-        'EPAS': 'B5',
-        'HARDWARE': 'B5'   
+        'ASSH': 'b1',
+        'BE': 'b2',
+        'STEM': 'b3',
+        'CSS': 'b4',
+        'DIGITAL': 'b4',   
+        'EIM': 'b5',
+        'EPAS': 'b5',
+        'HARDWARE': 'b5'   
     }
     
     # .upper() makes it case-insensitive so 'be' or 'BE' both work!
@@ -148,6 +148,25 @@ def read_sensor():
             return jsonify({'status': 'error', 'sensor': 'I0', 'message': 'Error/Reject Bin. Please rescan.'})
             
     return jsonify({'status': 'waiting', 'message': 'No sensor data detected yet.'})
+
+@app.route('/api/sensor/check-rejection', methods=['GET'])
+def check_rejection():
+    """Specifically checks for PAPER_REJECTED signal from Arduino."""
+    if not arduino:
+        # Simulation: To test the rejection flow, you could return rejected: true here temporarily
+        return jsonify({'rejected': False})
+        
+    # Read any buffered lines
+    if arduino.in_waiting > 0:
+        try:
+            line = arduino.readline().decode('utf-8').strip()
+            print(f"📡 Serial Read: {line}")
+            if 'PAPER_REJECTED' in line:
+                return jsonify({'rejected': True})
+        except Exception as e:
+            print(f"⚠️ Error reading serial for rejection: {e}")
+            
+    return jsonify({'rejected': False})
 
 # ==========================================
 # STATUS PING

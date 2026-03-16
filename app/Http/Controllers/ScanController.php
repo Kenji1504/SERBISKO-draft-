@@ -77,8 +77,10 @@ class ScanController extends Controller
 
             Storage::disk('public')->put($filePath, $imageBase64);
             $imageFullPath = storage_path('app/public/' . $filePath);
+            Log::info("Image saved locally", ['path' => $imageFullPath]);
 
             $prefix = $this->getPrefix($docType);
+            Log::info("Using prefix", ['prefix' => $prefix]);
 
             // Update Kiosk Enrollment with the new file path and initial status
             DB::table('kiosk_enrollments')->updateOrInsert(
@@ -93,6 +95,7 @@ class ScanController extends Controller
                     'updated_at' => now()
                 ]
             );
+            Log::info("Database updated with 'pending' status");
 
             // --- HELPER: Handles failures and checks for 3rd strike ---
             $handleFailure = function($remarks) use ($userId, $docType, $prefix) {
@@ -133,7 +136,7 @@ class ScanController extends Controller
             Log::info("Sending to OCR Server", ['url' => 'http://127.0.0.1:9001/ocr']);
 
             try {
-                $ocrResponse = Http::timeout(180)
+                $ocrResponse = Http::timeout(300)
                     ->attach('image', file_get_contents($imageFullPath), $fileName)
                     ->post('http://127.0.0.1:9001/ocr', [
                         'doc_type'   => $pythonDocType,
@@ -293,6 +296,41 @@ class ScanController extends Controller
             'current_doc' => $docType,
             'attempts' => $attempts
         ]);
+    }
+
+    public function checkRejection(Request $request) {
+        $userId = session('user_id');
+        if (!$userId) return response()->json(['rejected' => false]);
+
+        try {
+            $response = Http::timeout(2)->get('http://127.0.0.1:51234/api/sensor/check-rejection');
+            $data = $response->json();
+
+            if (isset($data['rejected']) && $data['rejected'] === true) {
+                $docType = session('current_doc', 'Unknown Document');
+                Log::warning("PAPER_REJECTED detected for User {$userId}, Doc: {$docType}");
+
+                // Update kiosk_enrollments with rejection info
+                $enrollment = DB::table('kiosk_enrollments')->where('id', $userId)->first();
+                $rejectedPapers = json_decode($enrollment->rejected_papers ?? '[]', true);
+                
+                $rejectedPapers[] = [
+                    'document_type' => $docType,
+                    'rejected_at' => now()->toDateTimeString(),
+                    'prefix' => $this->getPrefix($docType)
+                ];
+
+                DB::table('kiosk_enrollments')->where('id', $userId)->update([
+                    'rejected_papers' => json_encode($rejectedPapers)
+                ]);
+
+                return response()->json(['rejected' => true]);
+            }
+        } catch (\Exception $e) {
+            Log::error("Error checking rejection from Arduino: " . $e->getMessage());
+        }
+
+        return response()->json(['rejected' => false]);
     }
 
     private function getNextUrl($userId) {

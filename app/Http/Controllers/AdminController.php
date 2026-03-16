@@ -338,29 +338,26 @@ class AdminController extends Controller
                 'users.last_name',
                 'pe.responses'
             )
-            ->where(function($q) {
-                $q->where('sf9_status', 'manual_verification')
-                  ->orWhere('psa_status', 'manual_verification')
-                  ->orWhere('enroll_form_status', 'manual_verification')
-                  ->orWhere('als_cert_status', 'manual_verification')
-                  ->orWhere('affidavit_status', 'manual_verification');
-            })
             ->get();
 
         $pendingScans = collect();
+        $rejectedPapers = collect();
 
         foreach ($enrollments as $row) {
+            // 1. Check for Manual Verifications
             $docTypes = [
                 'sf9' => 'Report Card (SF9)',
                 'psa' => 'Birth Certificate',
                 'enroll_form' => 'Enrollment Form',
                 'als_cert' => 'ALS Certificate',
-                'affidavit' => 'Affidavit'
+                'affidavit' => 'Affidavit',
+                'good_moral' => 'Good Moral Certificate',
+                'sf10' => 'Form 137 / SF10'
             ];
 
             foreach ($docTypes as $prefix => $docName) {
                 $statusCol = "{$prefix}_status";
-                if ($row->$statusCol === 'manual_verification') {
+                if (isset($row->$statusCol) && $row->$statusCol === 'manual_verification') {
                     $pathCol = "{$prefix}_path";
                     
                     $details = json_decode($row->responses, true) ?? [];
@@ -377,13 +374,30 @@ class AdminController extends Controller
                     ]);
                 }
             }
+
+            // 2. Check for Rejected Papers (Physical Bin Rejections)
+            if ($row->rejected_papers) {
+                $rejections = json_decode($row->rejected_papers, true);
+                $details = json_decode($row->responses, true) ?? [];
+                $displayGrade = $row->grade_level ?? ($details['Grade Level to Enroll'] ?? '—');
+
+                foreach ($rejections as $rej) {
+                    $rejectedPapers->push((object)[
+                        'first_name' => $row->first_name,
+                        'last_name' => $row->last_name,
+                        'display_grade' => $displayGrade,
+                        'document_type' => $rej['document_type'],
+                        'rejected_at' => $rej['rejected_at']
+                    ]);
+                }
+            }
         }
 
         if (request()->ajax()) {
             return view('admin.partials.verification-table', compact('pendingScans'))->render();
         }
 
-        return view('admin.verification', compact('pendingScans')); 
+        return view('admin.verification', compact('pendingScans', 'rejectedPapers')); 
     }
 
     public function handleVerificationAction(Request $request) 

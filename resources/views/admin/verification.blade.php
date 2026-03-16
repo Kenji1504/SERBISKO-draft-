@@ -13,6 +13,59 @@
     <div id="verification-table-container" class="bg-white shadow-md rounded-lg overflow-hidden border border-gray-200">
         @include('admin.partials.verification-table')
     </div>
+
+    <!-- NEW: Rejected Paper List (Physical Bin Rejections) -->
+    <div class="mt-12">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-2xl font-bold text-red-700 flex items-center gap-2">
+                <span class="text-3xl">🗑️</span> Rejected Paper List (Physical Bin)
+            </h2>
+            <span class="bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider border border-red-200">
+                Live Monitoring
+            </span>
+        </div>
+        
+        <div class="bg-white shadow-md rounded-lg overflow-hidden border border-gray-200">
+            <div id="rejected-papers-container">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Student Name</th>
+                            <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Grade Level</th>
+                            <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Document Type</th>
+                            <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Rejected At</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        @forelse($rejectedPapers as $rej)
+                        <tr class="hover:bg-red-50 transition-colors">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                                {{ $rej->last_name }}, {{ $rej->first_name }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{ $rej->display_grade }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-orange-100 text-orange-800 border border-orange-200">
+                                    {{ $rej->document_type }}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400 font-mono">
+                                {{ \Carbon\Carbon::parse($rej->rejected_at)->format('M d, g:i A') }}
+                            </td>
+                        </tr>
+                        @empty
+                        <tr>
+                            <td colspan="4" class="px-6 py-10 text-center text-gray-400 italic">
+                                No physical paper rejections recorded.
+                            </td>
+                        </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
 </div>
 
 <div id="imageModal" class="fixed inset-0 z-50 hidden overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">

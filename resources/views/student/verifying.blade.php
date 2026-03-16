@@ -85,10 +85,26 @@
                         document.getElementById('storing-subtext').innerText = data.next_url.includes('thankyou') ? "All documents complete! Finishing up..." : "Preparing next document scan...";
 
                         showCard('success-card');
+
+                        // Start rejection polling during the 10s wait
+                        const rejectInterval = setInterval(() => {
+                            fetch('/student/check-rejection')
+                                .then(r => r.json())
+                                .then(rejData => {
+                                    if (rejData.rejected) {
+                                        console.log("PAPER_REJECTED recorded in background.");
+                                        // We don't stop the interval, just in case there are multiple signals
+                                    }
+                                });
+                        }, 2000);
+
                         setTimeout(() => {
                             showCard('storing-card');
                             document.getElementById('progress-bar').classList.add('animate-loading-bar');
-                            setTimeout(() => { window.location.href = data.next_url; }, 10000); 
+                            setTimeout(() => { 
+                                clearInterval(rejectInterval);
+                                window.location.href = data.next_url; 
+                            }, 10000); 
                         }, 2000); 
                     } 
                     // Waiting for Admin

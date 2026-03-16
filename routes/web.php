@@ -104,6 +104,7 @@ Route::get('/student/verifying', function () {
 });
 
 Route::get('/student/check-scan-status', [ScanController::class, 'checkScanStatus']);
+Route::get('/student/check-rejection', [ScanController::class, 'checkRejection']);
 
 Route::get('/api/check-completion', function () {
     $record = DB::table('kiosk_enrollments')
