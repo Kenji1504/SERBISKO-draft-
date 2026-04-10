@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use App\Models\User;
+use App\Models\SystemSetting;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -14,6 +15,17 @@ class SampleStudentSeeder extends Seeder
     public function run(): void
     {
         $faker = Faker::create();
+
+        // 0. Ensure System Settings exist
+        $activeSY = '2025-2026';
+        SystemSetting::updateOrCreate(
+            ['id' => 1],
+            [
+                'active_school_year' => $activeSY,
+                'active_sheet_range' => 'Form Responses 1!A1:ZZ',
+                'public_form_url' => 'https://docs.google.com/forms/sample',
+            ]
+        );
 
         // Clean up before seeding
         DB::statement('SET FOREIGN_KEY_CHECKS=0;');
@@ -48,9 +60,10 @@ class SampleStudentSeeder extends Seeder
             ]);
 
             $lrn = "10000000000" . ($index + 1);
-            DB::table('students')->insert([
+            $studentId = DB::table('students')->insertGetId([
                 'lrn' => $lrn,
                 'user_id' => $user->id,
+                'school_year' => $activeSY,
                 'sex' => $faker->randomElement(['Male', 'Female']),
                 'age' => $faker->numberBetween(15, 18),
                 'place_of_birth' => $faker->city,
@@ -64,7 +77,7 @@ class SampleStudentSeeder extends Seeder
 
             // Kind is stored in the Pre-enrollment data (from Google Sheets)
             DB::table('pre_enrollments')->insert([
-                'student_lrn' => $lrn,
+                'student_id' => $studentId,
                 'responses' => json_encode([
                     'Academic Status' => $kind, // This is the STUDENT KIND (Regular, ALS, etc.)
                     'Grade Level to Enroll' => 'Grade 11',
@@ -89,9 +102,10 @@ class SampleStudentSeeder extends Seeder
             ]);
 
             $lrn = "20000000000" . ($index + 1);
-            DB::table('students')->insert([
+            $studentId = DB::table('students')->insertGetId([
                 'lrn' => $lrn,
                 'user_id' => $user->id,
+                'school_year' => $activeSY,
                 'sex' => $faker->randomElement(['Male', 'Female']),
                 'age' => $faker->numberBetween(16, 19),
                 'place_of_birth' => $faker->city,
@@ -105,7 +119,7 @@ class SampleStudentSeeder extends Seeder
 
             // Pre-enrollment data - Still has the original kind
             DB::table('pre_enrollments')->insert([
-                'student_lrn' => $lrn,
+                'student_id' => $studentId,
                 'responses' => json_encode([
                     'Academic Status' => $kind,
                     'Grade Level to Enroll' => 'Grade 11',
@@ -119,6 +133,7 @@ class SampleStudentSeeder extends Seeder
 
             // Kiosk Enrollment - Mark as Officially Enrolled milestone
             DB::table('kiosk_enrollments')->insert([
+                'student_id' => $studentId,
                 'student_lrn' => $lrn,
                 'academic_status' => 'Officially Enrolled', // This is the MILESTONE status
                 'grade_level' => 'Grade 11',

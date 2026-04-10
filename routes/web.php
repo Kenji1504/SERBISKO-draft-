@@ -122,8 +122,10 @@ Route::get('/student/check-scan-status', [ScanController::class, 'checkScanStatu
 Route::get('/student/check-rejection', [ScanController::class, 'checkRejection']);
 
 Route::get('/api/check-completion', function () {
+    $userId = session('user_id', 1);
     $record = DB::table('kiosk_enrollments')
-                ->where('id', session('user_id', 1)) 
+                ->join('students', 'kiosk_enrollments.student_id', '=', 'students.id')
+                ->where('students.user_id', $userId) 
                 ->first();
     
     if (!$record) {

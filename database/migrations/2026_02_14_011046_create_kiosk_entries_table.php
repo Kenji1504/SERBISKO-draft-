@@ -15,10 +15,12 @@ return new class extends Migration
             $table->id(); // PK for the enrollment itself
             
             // 1. LINK TO STUDENT (Timeline Aware)
-            // This replaces student_lrn and user_id as the main connection
             $table->foreignId('student_id')
                   ->constrained('students')
                   ->onDelete('cascade');
+            
+            // Redundant LRN for legacy queries & easy lookups
+            $table->string('student_lrn')->nullable();
 
             // 2. CHOICES
             $table->string('academic_status')->nullable();

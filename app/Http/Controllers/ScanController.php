@@ -7,9 +7,15 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
+use App\Models\Student;
 
 class ScanController extends Controller
 {
+    private function getStudentId($userId) {
+        $student = Student::where('user_id', $userId)->first();
+        return $student ? $student->id : null;
+    }
+
     private function getPrefix($docType) {
         $lowerDoc = strtolower($docType);
         if (str_contains($lowerDoc, 'report') || str_contains($lowerDoc, 'sf9')) return 'sf9';
@@ -59,8 +65,9 @@ class ScanController extends Controller
             $imageData = $request->input('image_data');
             $docType = $request->input('document_type', 'Report Card (SF9)');
             $userId = session('user_id', 1);
+            $studentId = $this->getStudentId($userId);
 
-            Log::info("--- START processDocument ---", ['userId' => $userId, 'docType' => $docType]);
+            Log::info("--- START processDocument ---", ['userId' => $userId, 'studentId' => $studentId, 'docType' => $docType]);
 
             if (!$imageData || strpos($imageData, ';base64,') === false) {
                 return response()->json(['status' => 'error', 'message' => 'Image data is invalid.']);
@@ -82,10 +89,13 @@ class ScanController extends Controller
             $prefix = $this->getPrefix($docType);
             Log::info("Using prefix", ['prefix' => $prefix]);
 
+            $student = Student::find($studentId);
+
             // Update Kiosk Enrollment with the new file path and initial status
             DB::table('kiosk_enrollments')->updateOrInsert(
-                ['id' => $userId],
+                ['student_id' => $studentId],
                 [
+                    'student_lrn' => $student->lrn ?? null,
                     "{$prefix}_path" => $filePath,
                     "{$prefix}_status" => 'pending',
                     "{$prefix}_remarks" => 'Processing...',
@@ -98,15 +108,15 @@ class ScanController extends Controller
             Log::info("Database updated with 'pending' status");
 
             // --- HELPER: Handles failures and checks for 3rd strike ---
-            $handleFailure = function($remarks) use ($userId, $docType, $prefix) {
-                $enrollment = DB::table('kiosk_enrollments')->where('id', $userId)->first();
+            $handleFailure = function($remarks) use ($studentId, $docType, $prefix) {
+                $enrollment = DB::table('kiosk_enrollments')->where('student_id', $studentId)->first();
                 $attemptsCol = "{$prefix}_attempts";
                 $newAttempts = ($enrollment->$attemptsCol ?? 0) + 1;
 
                 $status = ($newAttempts >= 3) ? 'manual_verification' : 'failed';
                 $finalRemarks = ($newAttempts >= 3) ? 'Sent to Admin for Manual Verification.' : $remarks;
 
-                DB::table('kiosk_enrollments')->where('id', $userId)->update([
+                DB::table('kiosk_enrollments')->where('student_id', $studentId)->update([
                     "{$prefix}_status" => $status,
                     "{$prefix}_remarks" => $finalRemarks,
                     "{$prefix}_attempts" => $newAttempts,
@@ -114,7 +124,7 @@ class ScanController extends Controller
                     'latest_scan_remarks' => $finalRemarks
                 ]);
 
-                Log::warning("Failure handled", ['userId' => $userId, 'attempts' => $newAttempts, 'status' => $status]);
+                Log::warning("Failure handled", ['studentId' => $studentId, 'attempts' => $newAttempts, 'status' => $status]);
                 return ['is_strike_3' => ($newAttempts >= 3), 'count' => $newAttempts];
             };
 
@@ -166,7 +176,7 @@ class ScanController extends Controller
                     if ($lrn && $isReportCard) {
                         Log::info("LRN Found & Doc is Report Card. Preparing LIS call.");
                         
-                        DB::table('kiosk_enrollments')->where('id', $userId)->update([
+                        DB::table('kiosk_enrollments')->where('student_id', $studentId)->update([
                             'sf9_lrn' => $lrn, 
                             'sf9_remarks' => 'Sending to LIS...',
                             'student_lrn' => $lrn,
@@ -176,7 +186,7 @@ class ScanController extends Controller
                         
                         $enrollingGrade = session('grade_level');
                         if (!$enrollingGrade) {
-                            $enrollingGrade = DB::table('kiosk_enrollments')->where('id', $userId)->value('grade_level') ?? '11'; 
+                            $enrollingGrade = DB::table('kiosk_enrollments')->where('student_id', $studentId)->value('grade_level') ?? '11'; 
                         }
                         $expectedGrade = ($enrollingGrade == '12') ? 'Grade 11' : 'Grade 10';
 
@@ -203,7 +213,7 @@ class ScanController extends Controller
                         }
                     } else {
                         Log::info("Document verified without LIS (Non-Report Card or missing LRN)");
-                        DB::table('kiosk_enrollments')->where('id', $userId)->update([
+                        DB::table('kiosk_enrollments')->where('student_id', $studentId)->update([
                             "{$prefix}_status" => 'verified',
                             "{$prefix}_remarks" => 'Verified',
                             'latest_scan_status' => 'verified',
@@ -241,16 +251,17 @@ class ScanController extends Controller
         Log::info("LIS Callback received", ['userId' => $userId, 'status' => $status]);
 
         if ($userId && $status) {
+            $studentId = $this->getStudentId($userId);
             $finalStatus = ($status === 'verified_lis') ? 'verified' : 'failed';
             
             if ($finalStatus === 'failed') {
-                $enrollment = DB::table('kiosk_enrollments')->where('id', $userId)->first();
+                $enrollment = DB::table('kiosk_enrollments')->where('student_id', $studentId)->first();
                 $newAttempts = ($enrollment->sf9_attempts ?? 0) + 1;
                 
                 $dbStatus = ($newAttempts >= 3) ? 'manual_verification' : 'failed';
                 $remarks = ($newAttempts >= 3) ? 'Sent to Admin for Manual Verification.' : 'LIS Verification Failed.';
 
-                DB::table('kiosk_enrollments')->where('id', $userId)->update([
+                DB::table('kiosk_enrollments')->where('student_id', $studentId)->update([
                     'sf9_status' => $dbStatus,
                     'sf9_remarks' => $remarks,
                     'sf9_attempts' => $newAttempts,
@@ -259,7 +270,7 @@ class ScanController extends Controller
                     'updated_at' => now()
                 ]);
             } else {
-                DB::table('kiosk_enrollments')->where('id', $userId)->update([
+                DB::table('kiosk_enrollments')->where('student_id', $studentId)->update([
                     'sf9_status' => 'verified',
                     'sf9_remarks' => 'Verified',
                     'latest_scan_status' => 'verified',
@@ -280,7 +291,8 @@ class ScanController extends Controller
         $userId = session('user_id');
         if (!$userId) return response()->json(['status' => 'error', 'message' => 'Session expired.']);
 
-        $enrollment = DB::table('kiosk_enrollments')->where('id', $userId)->first();
+        $studentId = $this->getStudentId($userId);
+        $enrollment = DB::table('kiosk_enrollments')->where('student_id', $studentId)->first();
 
         if (!$enrollment) return response()->json(['status' => 'pending']);
 
@@ -311,7 +323,8 @@ class ScanController extends Controller
                 Log::warning("PAPER_REJECTED detected for User {$userId}, Doc: {$docType}");
 
                 // Update kiosk_enrollments with rejection info
-                $enrollment = DB::table('kiosk_enrollments')->where('id', $userId)->first();
+                $studentId = $this->getStudentId($userId);
+                $enrollment = DB::table('kiosk_enrollments')->where('student_id', $studentId)->first();
                 $rejectedPapers = json_decode($enrollment->rejected_papers ?? '[]', true);
                 
                 // --- DUPLICATE CHECK ---
@@ -334,7 +347,7 @@ class ScanController extends Controller
                         'prefix' => $this->getPrefix($docType)
                     ];
 
-                    DB::table('kiosk_enrollments')->where('id', $userId)->update([
+                    DB::table('kiosk_enrollments')->where('student_id', $studentId)->update([
                         'rejected_papers' => json_encode($rejectedPapers)
                     ]);
                 }
@@ -363,7 +376,8 @@ class ScanController extends Controller
         }
 
         // Check if EVERYTHING required for their status is verified
-        $enrollment = DB::table('kiosk_enrollments')->where('id', $userId)->first();
+        $studentId = $this->getStudentId($userId);
+        $enrollment = DB::table('kiosk_enrollments')->where('student_id', $studentId)->first();
         if ($enrollment) {
             $enrollController = new \App\Http\Controllers\EnrollmentController();
             $requiredDocs = $enrollController->getRequiredDocs($enrollment->academic_status);

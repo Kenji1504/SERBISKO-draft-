@@ -20,46 +20,24 @@ class StudentController extends Controller
         // Allow manual override via request (for viewing old archives)
         $selectedYear = $request->get('school_year', $activeSY);
 
-        // Subquery to get only the LATEST version per student
-        $latestPreEnrollments = DB::table('pre_enrollments')
-            ->select('student_id', DB::raw('MAX(submission_version) as max_version'))
-            ->groupBy('student_id');
-
         $query = DB::table('users')
-            ->leftJoin('students', 'users.id', '=', 'students.user_id')
+            ->join('students', 'users.id', '=', 'students.user_id')
             ->whereNull('users.deleted_at')
-            ->where('students.school_year', $selectedYear) 
             ->where('users.role', 'student')
-
-        // 1.  the subquery first to find the max version
-        ->leftJoinSub($latestPreEnrollments, 'latest_version_map', function ($join) {
-            $join->on('students.id', '=', 'latest_version_map.student_id');
-        })
-        // 2. the actual table matching both student_id AND that max version
-        ->leftJoin('pre_enrollments', function ($join) {
-            $join->on('students.id', '=', 'pre_enrollments.student_id')
-                 ->on('pre_enrollments.submission_version', '=', 'latest_version_map.max_version');
-        })
-        
-        ->leftJoin('kiosk_enrollments', 'users.id', '=', 'kiosk_enrollments.id')
-        ->select(
-            'students.id',
-            'users.first_name', 'users.last_name', 'users.middle_name',
-            'users.created_at', 'users.id as user_primary_id',
-            'students.lrn', 'users.extension_name',
-            'pre_enrollments.responses', 
-            'kiosk_enrollments.grade_level as kiosk_grade',
-            'kiosk_enrollments.track as kiosk_track',
-            'kiosk_enrollments.cluster as kiosk_cluster',
-            'kiosk_enrollments.academic_status as kiosk_status',
-            'kiosk_enrollments.sf9_status',
-            'kiosk_enrollments.psa_status',
-            'kiosk_enrollments.enroll_form_status',
-            'kiosk_enrollments.als_cert_status',
-            'kiosk_enrollments.affidavit_status',
-            'kiosk_enrollments.good_moral_status',
-            'kiosk_enrollments.sf10_status'
-        );
+            ->leftJoin('pre_enrollments', 'students.id', '=', 'pre_enrollments.student_id')
+            ->leftJoin('kiosk_enrollments', 'students.id', '=', 'kiosk_enrollments.student_id')
+            ->select(
+                'students.lrn as id', // ALIAS LRN AS ID FOR BLADE VIEW COMPATIBILITY
+                'students.lrn', 
+                'users.first_name', 'users.last_name', 'users.middle_name',
+                'users.created_at', 'users.id as user_primary_id',
+                'users.extension_name',
+                'pre_enrollments.responses', 
+                'kiosk_enrollments.grade_level as kiosk_grade',
+                'kiosk_enrollments.track as kiosk_track',
+                'kiosk_enrollments.cluster as kiosk_cluster',
+                'kiosk_enrollments.academic_status as kiosk_status'
+            );
 
         if ($request->filled('search')) {
             $searchTerm = trim($request->search);
@@ -113,21 +91,8 @@ class StudentController extends Controller
             }
         }
 
-        if ($request->filled('requirements_status')) {
-            $status = $request->requirements_status;
-            $query->where(function($q) use ($status) {
-                $cols = ['sf9_status', 'psa_status', 'enroll_form_status', 'als_cert_status', 'affidavit_status', 'good_moral_status', 'sf10_status'];
-                if ($status === 'Complete') {
-                    foreach ($cols as $col) {
-                        $q->orWhere("kiosk_enrollments.$col", 'verified');
-                    }
-                } else {
-                    foreach ($cols as $col) {
-                        $q->where("kiosk_enrollments.$col", '!=', 'verified');
-                    }
-                }
-            });
-        }
+        // Requirements status filter removed because columns don't exist in kiosk_enrollments
+        // It should be refactored to use the scans table if needed.
 
         switch ($request->get('sort')) {
             case 'za': $query->orderBy('users.last_name', 'desc'); break;
@@ -177,12 +142,12 @@ class StudentController extends Controller
                 $student->status_style = 'bg-[#048F81] text-white border-[#048F81]';
             }
 
-            // Requirement Status Logic
-            $verifiedCount = 0;
-            $cols = ['sf9_status', 'psa_status', 'enroll_form_status', 'als_cert_status', 'affidavit_status', 'good_moral_status', 'sf10_status'];
-            foreach ($cols as $col) {
-                if ($student->$col === 'verified') $verifiedCount++;
-            }
+            // Check verified scans for this student (using lrn)
+            $verifiedCount = DB::table('scans')
+                ->where('lrn', $student->lrn)
+                ->where('status', 'verified')
+                ->count();
+
             $student->requirement_display = $verifiedCount > 0 ? 'Verified' : 'Pending';
             $student->requirement_style = $verifiedCount > 0 ? 'text-green-600 font-bold' : 'text-gray-600';
 
@@ -196,47 +161,35 @@ class StudentController extends Controller
     // 3. STUDENT PROFILE LOGIC
     public function profilepage($id)
     {
-        // 1. Get latest version first
-        $latestVersion = DB::table('pre_enrollments')
-            ->where('student_id', $id)
-            ->max('submission_version');
-
-        // 2. Fetch the student - Using students.* to avoid "Unknown Column" crashes if you add more later
+        // 1. Fetch the student - Using lrn as the identifier ($id)
         $student = DB::table('students')
             ->join('users', 'students.user_id', '=', 'users.id')
-            ->leftJoin('pre_enrollments', function($join) use ($latestVersion) {
-                $join->on('students.id', '=', 'pre_enrollments.student_id')
-                    ->where('pre_enrollments.submission_version', '=', $latestVersion);
-            })
-            ->leftJoin('kiosk_enrollments', 'users.id', '=', 'kiosk_enrollments.id') 
-            ->leftJoin('users as editors', 'students.manually_edited_by', '=', 'editors.id') 
+            ->leftJoin('pre_enrollments', 'students.id', '=', 'pre_enrollments.student_id')
+            ->leftJoin('kiosk_enrollments', 'students.id', '=', 'kiosk_enrollments.student_id') 
             ->select([
-                'students.id', 
-                'students.*', // This ensures all address/parental columns are included
+                'students.lrn as id', // Alias for consistency
+                'students.*', 
                 'users.first_name', 'users.last_name', 'users.extension_name', 'users.middle_name', 'users.birthday', 
                 'pre_enrollments.responses',
                 'kiosk_enrollments.grade_level as kiosk_grade', 
                 'kiosk_enrollments.track as kiosk_track',
                 'kiosk_enrollments.cluster as kiosk_cluster', 
-                'kiosk_enrollments.academic_status as kiosk_status',
-                'editors.first_name as editor_name',
-                'editors.last_name as editor_lastname'
+                'kiosk_enrollments.academic_status as kiosk_status'
             ])
-            ->where('students.id', $id)
+            ->where('students.lrn', $id)
             ->whereNull('users.deleted_at')
             ->first();
 
         if (!$student) abort(404);
 
-        // 3. JSON Parsing & Key Normalization
+        // 2. JSON Parsing & Key Normalization
         $rawDetails = json_decode($student->responses, true) ?: [];
         $details = [];
         foreach ($rawDetails as $key => $value) {
             $details[strtolower(trim($key))] = $value;
         }
 
-        // 4. Mapping Logic (Using the keys you provided)
-        // This looks for any of your aliases in the JSON responses
+        // 3. Mapping Logic
         $getMappedValue = function($aliases) use ($details) {
             foreach ($aliases as $alias) {
                 if (isset($details[strtolower($alias)])) {
@@ -246,18 +199,11 @@ class StudentController extends Controller
             return null;
         };
 
-        // 5. Dynamic Assignment using your mapping
         $finalGrade   = $student->kiosk_grade   ?? ($getMappedValue(['Grade Level to Enroll', 'grade']) ?? '—');
         $finalTrack   = $student->kiosk_track   ?? ($getMappedValue(['Track']) ?? '—');
         $finalStatus  = $student->kiosk_status  ?? ($getMappedValue(['Academic Status']) ?? '—');
-        
-        // Dynamic Cluster check
-        $finalCluster = $student->kiosk_cluster 
-                    ?? $getMappedValue(['Cluster of Electives', 'cluster', 'elective cluster']) 
-                    ?? '—';
+        $finalCluster = $student->kiosk_cluster ?? ($getMappedValue(['Cluster of Electives', 'cluster', 'elective cluster']) ?? '—');
 
-        // 6. Filter out the core keys for the "Dynamic Details" section
-        // This prevents showing info twice (once in the header, once in the list)
         $fixedKeys = [
             'first name', 'given name', 'fname', 'pangalan', 'last name', 'surname', 'family name', 'apelyido',
             'middle name', 'mname', 'extension name', 'ext', 'suffix', 'birthday', 'date of birth', 'dob',
@@ -267,38 +213,16 @@ class StudentController extends Controller
         $dynamicDetails = [];
         foreach ($details as $key => $value) {
             if (!in_array($key, $fixedKeys)) {
-                // Capitalize keys for better UI display (e.g., "mother_tongue" -> "Mother Tongue")
                 $displayKey = ucwords(str_replace(['_', '-'], ' ', $key));
                 $dynamicDetails[$displayKey] = $value;
             }
         }
 
-        // 7. Fetch Scanned Documents from kiosk_enrollments
-        $verifiedScans = [];
-        $docTypes = [
-            'sf9' => 'Report Card (SF9)',
-            'psa' => 'Birth Certificate',
-            'enroll_form' => 'Enrollment Form',
-            'als_cert' => 'ALS Certificate',
-            'affidavit' => 'Affidavit',
-            'good_moral' => 'Good Moral Certificate',
-            'sf10' => 'Form 137 / SF10'
-        ];
-
-        $enrollment = DB::table('kiosk_enrollments')->where('id', $student->user_id)->first();
-        if ($enrollment) {
-            foreach ($docTypes as $prefix => $label) {
-                $statusCol = "{$prefix}_status";
-                $pathCol = "{$prefix}_path";
-                if (isset($enrollment->$statusCol) && $enrollment->$statusCol === 'verified' && !empty($enrollment->$pathCol)) {
-                    $verifiedScans[] = (object)[
-                        'document_type' => $label,
-                        'file_path' => $enrollment->$pathCol,
-                        'created_at' => $enrollment->updated_at
-                    ];
-                }
-            }
-        }
+        // 4. Fetch Scanned Documents from scans table
+        $verifiedScans = DB::table('scans')
+            ->where('lrn', $student->lrn)
+            ->where('status', 'verified')
+            ->get();
 
         return view('admin.studentpage.profilepage', compact(
             'student', 'details', 'dynamicDetails', 
@@ -318,7 +242,7 @@ class StudentController extends Controller
 
         DB::beginTransaction();
         try {
-            $student = DB::table('students')->where('id', $id)->first();
+            $student = DB::table('students')->where('lrn', $id)->first();
             if (!$student) throw new \Exception("Student record not found.");
 
             // 2. Update Master Identity (Users Table)
@@ -331,10 +255,9 @@ class StudentController extends Controller
                 'updated_at'     => now(),
             ]);
 
-            // 3. Prepare Student Data - GET EVERYTHING FROM THE REQUEST
-            // This ensures fields like father_contact_number and address fields are captured
+            // 3. Prepare Student Data
             $studentFields = $request->only([
-                'lrn', 'sex', 'place_of_birth', 'mother_tongue',
+                'sex', 'place_of_birth', 'mother_tongue',
                 'curr_house_number', 'curr_street', 'curr_barangay', 'curr_city', 'curr_province', 'curr_zip_code',
                 'perm_house_number', 'perm_street', 'perm_barangay', 'perm_city', 'perm_province', 'perm_zip_code',
                 'father_last_name', 'father_first_name', 'father_middle_name', 'father_contact_number',
@@ -342,24 +265,21 @@ class StudentController extends Controller
                 'guardian_last_name', 'guardian_first_name', 'guardian_middle_name', 'guardian_contact_number'
             ]);
 
-            // Add the lock and timestamp
             $studentFields['is_manually_edited'] = 1;
-            $studentFields['manually_edited_by'] = Auth::id();
             $studentFields['updated_at'] = now();
 
             // 4. Update the Students Table
-            DB::table('students')->where('id', $id)->update($studentFields);
+            DB::table('students')->where('lrn', $id)->update($studentFields);
 
             // 5. Update JSON Responses (Extra Fields)
             if ($request->has('responses')) {
                 $preEnrollment = DB::table('pre_enrollments')
-                    ->where('student_id', $id)
-                    ->orderBy('submission_version', 'desc')
+                    ->where('student_id', $student->id)
+                    ->latest()
                     ->first();
 
                 if ($preEnrollment) {
                     $currentResponses = json_decode($preEnrollment->responses, true) ?? [];
-                    // Merge new inputs into existing JSON
                     $updatedResponses = array_merge($currentResponses, $request->responses);
 
                     DB::table('pre_enrollments')
@@ -383,16 +303,16 @@ class StudentController extends Controller
     {
         DB::beginTransaction();
         try {
-            $student = DB::table('students')->where('id', $id)->first();
+            $student = DB::table('students')->where('lrn', $id)->first();
             if (!$student) return back()->with('error', 'Student not found.');
 
-            // 1. Mark who deleted it in the students table
-            DB::table('students')->where('id', $id)->update([
+            // Mark deletion in students table (no id column, so we use lrn)
+            DB::table('students')->where('lrn', $id)->update([
                 'deleted_by' => Auth::id(),
                 'updated_at' => now()
             ]);
 
-            // 2. Soft delete the user record
+            // Soft delete user
             DB::table('users')->where('id', $student->user_id)->update([
                 'deleted_at' => now()
             ]);

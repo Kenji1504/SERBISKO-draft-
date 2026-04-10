@@ -6,11 +6,16 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use App\Models\Student;
 
 class EnrollmentController extends Controller
 {
     private function getUserId() {
         return session('user_id');
+    }
+
+    private function getStudent($userId) {
+        return Student::where('user_id', $userId)->first();
     }
 
     public function saveGrade(Request $request) {
@@ -19,11 +24,18 @@ class EnrollmentController extends Controller
         
         if (!$userId) return redirect('/login')->withErrors(['error' => 'Session expired.']);
 
+        $student = $this->getStudent($userId);
+        if (!$student) {
+            Log::error("Student record not found for User ID: " . $userId);
+            return redirect('/login')->withErrors(['error' => 'Student record not found.']);
+        }
+
         session(['grade_level' => $request->grade_level]);
         
         DB::table('kiosk_enrollments')->updateOrInsert(
-            ['id' => $userId],
+            ['student_id' => $student->id],
             [
+                'student_lrn' => $student->lrn,
                 'grade_level' => $request->grade_level, 
                 'updated_at' => now(),
                 'started_at' => DB::raw('IFNULL(started_at, NOW())')
@@ -35,9 +47,10 @@ class EnrollmentController extends Controller
 
     public function saveStatus(Request $request) {
         $userId = $this->getUserId();
+        $student = $this->getStudent($userId);
         session(['student_status' => $request->student_status]);
         
-        DB::table('kiosk_enrollments')->where('id', $userId)
+        DB::table('kiosk_enrollments')->where('student_id', $student->id)
             ->update(['academic_status' => $request->student_status]);
 
         return redirect('/student/track-selection');
@@ -45,9 +58,10 @@ class EnrollmentController extends Controller
 
     public function saveTrack(Request $request) {
         $userId = $this->getUserId();
+        $student = $this->getStudent($userId);
         session(['track' => $request->track]);
         
-        DB::table('kiosk_enrollments')->where('id', $userId)
+        DB::table('kiosk_enrollments')->where('student_id', $student->id)
             ->update(['track' => $request->track]);
 
         return redirect('/student/cluster-selection');
@@ -56,10 +70,11 @@ class EnrollmentController extends Controller
     public function saveCluster(Request $request) {
         $cluster = $request->input('cluster');
         $userId = $this->getUserId();
+        $student = $this->getStudent($userId);
         session(['cluster' => $cluster]);
 
         // Update Database
-        DB::table('kiosk_enrollments')->where('id', $userId)
+        DB::table('kiosk_enrollments')->where('student_id', $student->id)
             ->update(['cluster' => $cluster]);
 
         // Arduino Physical Triggers
@@ -102,7 +117,10 @@ class EnrollmentController extends Controller
         $userId = $this->getUserId();
         if (!$userId) return redirect('/login');
 
-        $enrollment = DB::table('kiosk_enrollments')->where('id', $userId)->first();
+        $student = $this->getStudent($userId);
+        if (!$student) return redirect('/login');
+
+        $enrollment = DB::table('kiosk_enrollments')->where('student_id', $student->id)->first();
         if (!$enrollment) {
             Log::warning("Checklist reached without enrollment record", ['userId' => $userId]);
             return redirect('/student/grade-selection');
@@ -135,6 +153,7 @@ class EnrollmentController extends Controller
     public function saveChecklist(Request $request) {
         $selectedDocs = $request->input('documents', []);
         $userId = $this->getUserId();
+        $student = $this->getStudent($userId);
         
         Log::info("Checklist Submitted", ['userId' => $userId, 'selected' => $selectedDocs]);
 
@@ -142,7 +161,7 @@ class EnrollmentController extends Controller
             return back()->withErrors(['error' => 'Please select at least one document.']);
         }
 
-        $enrollment = DB::table('kiosk_enrollments')->where('id', $userId)->first();
+        $enrollment = DB::table('kiosk_enrollments')->where('student_id', $student->id)->first();
         
         // Filter out docs that are already verified or pending manual review
         $toScan = [];

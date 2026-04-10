@@ -13,18 +13,10 @@ class DashboardController extends Controller
     public function index(Request $request) 
     {
         $settings = DB::table('system_settings')->first();
-        $activeSY = $settings ? $settings->active_school_year : '2025-2026';
         $grade = $request->grade_level;
 
-        // --- NEW: Subquery for latest version ---
-        $latestPreEnrollments = DB::table('pre_enrollments')
-            ->select('student_id', DB::raw('MAX(submission_version) as max_version'))
-            ->groupBy('student_id');
-
-        // Reusable filter updated with Version Control
-        $applyFilter = function($query) use ($grade, $activeSY) {
-            $query->where('students.school_year', $activeSY);
-
+        // Reusable filter - REMOVED school_year as it doesn't exist in students table in DB
+        $applyFilter = function($query) use ($grade) {
             if (!empty($grade)) {
                 $query->where(function($q) use ($grade) {
                     $q->where('kiosk_enrollments.grade_level', '=', $grade)
@@ -37,42 +29,34 @@ class DashboardController extends Controller
             return $query;
         };
 
-        // --- Core Enrollment Stats (Now Joined with Latest Version Only) ---
+        // --- Core Enrollment Stats ---
+        // Joined using actual DB columns (students.id, students.user_id)
         $baseQuery = DB::table('students')
             ->join('users', 'students.user_id', '=', 'users.id') 
             ->whereNull('users.deleted_at')
-            // Join the version map
-            ->leftJoinSub($latestPreEnrollments, 'latest_v', function($join) {
-                $join->on('students.id', '=', 'latest_v.student_id');
-            })
-            // Join the actual responses for the latest version only
-            ->leftJoin('pre_enrollments', function($join) {
-                $join->on('students.id', '=', 'pre_enrollments.student_id')
-                     ->on('pre_enrollments.submission_version', '=', 'latest_v.max_version');
-            })
-            ->leftJoin('kiosk_enrollments', 'users.id', '=', 'kiosk_enrollments.id');
+            ->leftJoin('pre_enrollments', 'students.id', '=', 'pre_enrollments.student_id')
+            ->leftJoin('kiosk_enrollments', 'students.id', '=', 'kiosk_enrollments.student_id');
 
-        $totalRegistrations = $applyFilter(clone $baseQuery)->count();
+        $totalRegistrations = $applyFilter(clone $baseQuery)->count('students.lrn');
 
         $totalSubmissions = $applyFilter(clone $baseQuery)
-            ->whereNotNull('kiosk_enrollments.id')
-            ->count();
+            ->whereNotNull('kiosk_enrollments.student_id')
+            ->count('students.lrn');
 
         $totalEnrolled = $applyFilter(clone $baseQuery)
             ->where('kiosk_enrollments.academic_status', '=', 'Officially Enrolled')
-            ->count();
+            ->count('students.lrn');
 
         // --- Stats Calculation ---
         $max = $totalRegistrations > 0 ? $totalRegistrations : 1;
         $percVerified = ($totalSubmissions / $max) * 100;
         $percEnrolled = ($totalEnrolled / $max) * 100;
 
-        // --- Elective Counting (Filtered by SY and User Status) ---
+        // --- Elective Counting ---
         $rawCounts = DB::table('kiosk_enrollments')
-            ->join('users', 'kiosk_enrollments.id', '=', 'users.id')
-            ->join('students', 'users.id', '=', 'students.user_id')
+            ->join('students', 'kiosk_enrollments.student_id', '=', 'students.id')
+            ->join('users', 'students.user_id', '=', 'users.id')
             ->whereNull('users.deleted_at')
-            ->where('students.school_year', $activeSY)
             ->when(!empty($grade), function($query) use ($grade) {
                 return $query->where('kiosk_enrollments.grade_level', $grade);
             })
@@ -91,10 +75,9 @@ class DashboardController extends Controller
 
         // --- Recent Submissions ---
         $recentKioskSubmissions = DB::table('kiosk_enrollments')
-            ->join('users', 'kiosk_enrollments.id', '=', 'users.id')
-            ->join('students', 'users.id', '=', 'students.user_id')
+            ->join('students', 'kiosk_enrollments.student_id', '=', 'students.id')
+            ->join('users', 'students.user_id', '=', 'users.id')
             ->whereNull('users.deleted_at')
-            ->where('students.school_year', $activeSY)
             ->select(
                 'users.first_name', 'users.middle_name', 'users.last_name',
                 'users.extension_name', 'kiosk_enrollments.grade_level',
@@ -111,6 +94,7 @@ class DashboardController extends Controller
         // --- Sync & Gradient logic ---
         $lastSync = DB::table('sync_histories')->where('status', 'Success')->latest()->first();
         $lastSyncTime = $lastSync ? Carbon::parse($lastSync->created_at)->diffForHumans() : 'Never';
+        $activeSY = $settings ? $settings->active_school_year : '2025-2026';
 
         $totalElectives = array_sum($electiveCounts) ?: 1;
         $pSTEM = ($electiveCounts['STEM'] / $totalElectives) * 100;

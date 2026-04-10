@@ -62,7 +62,7 @@
                 <h2 class="text-[#005288] text-2xl font-extrabold uppercase tracking-tight flex items-center gap-3">
                     {{ $student->first_name }} {{ $student->middle_name ? substr($student->middle_name, 0, 1) . '.' : '' }} {{ $student->last_name }} {{ $student->extension_name ? $student->extension_name : '' }}
                     
-                    @if($student->is_manually_edited)
+                    @if(isset($student->is_manually_edited) && $student->is_manually_edited)
                         <span class="text-[10px] bg-amber-100 text-amber-700 px-3 py-1 rounded-full border border-amber-200 font-black tracking-widest uppercase">
                             Locked from Sync
                         </span>
