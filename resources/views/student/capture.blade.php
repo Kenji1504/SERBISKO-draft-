@@ -117,7 +117,10 @@
                 </div>
             </div>
 
-            <div class="mt-8 flex justify-center">
+            <div class="mt-8 flex justify-center gap-6">
+                <a href="{{ url('/student/checklist') }}" class="bg-white border-2 border-blue-900 text-blue-900 font-bold text-lg px-12 py-4 rounded-full hover:bg-gray-50 transition transform hover:scale-105 tracking-wide">
+                    BACK
+                </a>
                 <form id="uploadForm" action="{{ url('/student/save-image') }}" method="POST">
                     @csrf 
                     <input type="hidden" name="image_data" id="image-data">

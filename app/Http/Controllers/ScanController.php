@@ -57,6 +57,15 @@ class ScanController extends Controller
         }
     }
 
+    public function stopConveyor() {
+        try {
+            Http::timeout(3)->post('http://127.0.0.1:51234/api/conveyor/stop');
+            return response()->json(['success' => true]);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
     public function processDocument(Request $request)
     {
         try {
@@ -86,6 +95,17 @@ class ScanController extends Controller
             $imageFullPath = storage_path('app/public/' . $filePath);
             Log::info("Image saved locally", ['path' => $imageFullPath]);
 
+            // Track scan in history
+            $scanId = DB::table('scans')->insertGetId([
+                'user_id' => $userId,
+                'document_type' => $docType,
+                'file_path' => $filePath,
+                'status' => 'pending',
+                'remarks' => 'Processing...',
+                'created_at' => now(),
+                'updated_at' => now()
+            ]);
+
             $prefix = $this->getPrefix($docType);
             Log::info("Using prefix", ['prefix' => $prefix]);
 
@@ -108,7 +128,7 @@ class ScanController extends Controller
             Log::info("Database updated with 'pending' status");
 
             // --- HELPER: Handles failures and checks for 3rd strike ---
-            $handleFailure = function($remarks) use ($studentId, $docType, $prefix) {
+            $handleFailure = function($remarks) use ($studentId, $docType, $prefix, $scanId) {
                 $enrollment = DB::table('kiosk_enrollments')->where('student_id', $studentId)->first();
                 $attemptsCol = "{$prefix}_attempts";
                 $newAttempts = ($enrollment->$attemptsCol ?? 0) + 1;
@@ -122,6 +142,13 @@ class ScanController extends Controller
                     "{$prefix}_attempts" => $newAttempts,
                     'latest_scan_status' => $status,
                     'latest_scan_remarks' => $finalRemarks
+                ]);
+
+                // Update the scan history record too
+                DB::table('scans')->where('id', $scanId)->update([
+                    'status' => $status,
+                    'remarks' => $finalRemarks,
+                    'updated_at' => now()
                 ]);
 
                 Log::warning("Failure handled", ['studentId' => $studentId, 'attempts' => $newAttempts, 'status' => $status]);
