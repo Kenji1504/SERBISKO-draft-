@@ -1,390 +1,316 @@
 @extends('admin.layout')
 
 @section('page_title')
-    Student Profile
+    <div class="flex justify-center items-end w-full pb-2 font-['Inter'] tracking-normal">
+        <nav class="flex" aria-label="Breadcrumb">
+            <ol class="inline-flex items-baseline space-x-2">
+                <li><a href="{{ route('admin.students') }}" class="text-[16px] font-medium text-gray-500 hover:text-[#00923F] transition-colors">Students</a></li>
+                <li class="flex text-[16px] font-bold text-[#00923F]">
+                    <span class="mx-2 text-gray-400 select-none">></span>
+                    <span>{{ $student->first_name }} {{ $student->last_name }} {{ $student->extension_name ? $student->extension_name : '' }}'s Profile</span>
+                </li>
+            </ol>
+        </nav>
+    </div>
 @endsection
 
 @section('content')
-<div class="p-6 font-['Inter'] tracking-normal space-y-4">
+{{-- Wrap the entire section in Alpine.js and a Form --}}
+<div x-data="{ editing: false }" class="p-6 font-['Inter'] tracking-normal space-y-4">
 
-    <div class="bg-[#F7FBF9]/40 rounded-xl shadow-md border border-gray-100 p-5">
-        <h2 class="text-[#005288] text-2xl font-extrabold uppercase tracking-tight">
-            {{ $student->first_name }} {{ $student->middle_name ? substr($student->middle_name, 0, 1) . '.' : '' }} {{ $student->last_name }} {{ $student->extension_name ? $student->extension_name : '' }}
-        </h2>
-        <h3 class="text-gray-500 text-sm font-bold uppercase tracking-tight">{{ $student->lrn }}</h3>
+    @php
+        $renderFields = function($fields, $cols = 'md:grid-cols-2', $isJson = false) {
+            $html = "<div class='grid grid-cols-1 $cols gap-x-12 gap-y-6'>";
+            foreach ($fields as $label => $value) {
+                // Logic to create input names...
+                $rawKey = strtolower(str_replace([':', ' ', "'", '#'], ['', '_', '', 'number'], $label));
+                $inputName = $isJson ? "responses[$rawKey]" : $rawKey;
+                $val = $value ?: '';
+
+                $html .= "
+                <div class='relative border-b-2 border-gray-200 pb-1 group hover:border-[#005288] transition-colors duration-200'>
+                    <label class='block text-[10px] font-bold text-gray-400 mb-1'>$label</label>
+                    <p x-show='!editing' class='text-[13px] uppercase text-[#003918] min-h-6'>".($val ?: '—')."</p>
+                    <input x-show='editing' type='text' name='$inputName' value='$val' 
+                        class='w-full text-[13px] uppercase text-[#005288] bg-white border-none p-0 focus:ring-0 outline-none font-bold'>
+                </div>";
+            }
+            $html .= "</div>";
+            return $html;
+        };
         
-        <div class="mt-6 pt-4 border-t border-gray-100">
-            <div class="mb-3">
-                <label for="sectionSelect" class="block text-xs font-semibold text-gray-600 mb-1">Select LIS Section to enroll:</label>
-                <select id="sectionSelect" class="w-full sm:w-72 px-3 py-2 rounded-lg border border-gray-300 focus:border-[#005288] focus:outline-none">
-                    <option value="">Choose section...</option>
-                    <option value="Grade 11 - Bezos (SY 2025–2026)">Grade 11 - Bezos (SY 2025–2026)</option>
-                    <option value="Grade 11 - Gates (SY 2025–2026)">Grade 11 - Gates (SY 2025–2026)</option>
-                    <option value="Grade 11 - Buffett (SY 2025–2026)">Grade 11 - Buffett (SY 2025–2026)</option>
-                    <option value="Grade 11 - Arnault (SY 2025–2026)">Grade 11 - Arnault (SY 2025–2026)</option>
-                    <option value="Grade 11 - Ellison (SY 2025–2026)">Grade 11 - Ellison (SY 2025–2026)</option>
-                    <option value="Grade 11 - Page (SY 2025–2026)">Grade 11 - Page (SY 2025–2026)</option>
-                    <option value="Grade 11 - Musk (SY 2025–2026)">Grade 11 - Musk (SY 2025–2026)</option>
-                    <option value="Grade 11 - Ambani (SY 2025–2026)">Grade 11 - Ambani (SY 2025–2026)</option>
-                    <option value="Grade 11 - Bang Si-Hyuk (SY 2025–2026)">Grade 11 - Bang Si-Hyuk (SY 2025–2026)</option>
-                    <option value="Grade 11 - Husserl (SY 2025–2026)">Grade 11 - Husserl (SY 2025–2026)</option>
-                    <option value="Grade 11 - Comte (SY 2025–2026)">Grade 11 - Comte (SY 2025–2026)</option>
-                    <option value="Grade 11 - Aquinas (SY 2025–2026)">Grade 11 - Aquinas (SY 2025–2026)</option>
-                    <option value="Grade 11 - Herodotus (SY 2025–2026)">Grade 11 - Herodotus (SY 2025–2026)</option>
-                    <option value="Grade 11 - Durkheim (SY 2025–2026)">Grade 11 - Durkheim (SY 2025–2026)</option>
-                    <option value="Grade 11 - Enriquez (SY 2025–2026)">Grade 11 - Enriquez (SY 2025–2026)</option>
-                    <option value="Grade 11 - Freud (SY 2025–2026)">Grade 11 - Freud (SY 2025–2026)</option>
-                    <option value="Grade 11 - Heidegger (SY 2025–2026)">Grade 11 - Heidegger (SY 2025–2026)</option>
-                    <option value="Grade 11 - Confucius (SY 2025–2026)">Grade 11 - Confucius (SY 2025–2026)</option>
-                    <option value="Grade 11 - Mercado (SY 2025–2026)">Grade 11 - Mercado (SY 2025–2026)</option>
-                    <option value="Grade 11 - Plato (SY 2025–2026)">Grade 11 - Plato (SY 2025–2026)</option>
-                    <option value="Grade 11 - Socrates (SY 2025–2026)">Grade 11 - Socrates (SY 2025–2026)</option>
-                    <option value="Grade 11 - Adler (SY 2025–2026)">Grade 11 - Adler (SY 2025–2026)</option>
-                    <option value="Grade 11 - Agoncillo (SY 2025–2026)">Grade 11 - Agoncillo (SY 2025–2026)</option>
-                    <option value="Grade 11 - Salazar (SY 2025–2026)">Grade 11 - Salazar (SY 2025–2026)</option>
-                    <option value="Grade 11 - Descartes (SY 2025–2026)">Grade 11 - Descartes (SY 2025–2026)</option>
-                    <option value="Grade 11 - Euclid (SY 2025–2026)">Grade 11 - Euclid (SY 2025–2026)</option>
-                    <option value="Grade 11 - Pythagoras (SY 2025–2026)">Grade 11 - Pythagoras (SY 2025–2026)</option>
-                    <option value="Grade 11 - Archimedes (SY 2025–2026)">Grade 11 - Archimedes (SY 2025–2026)</option>
-                    <option value="Grade 11 - Fibonacci (SY 2025–2026)">Grade 11 - Fibonacci (SY 2025–2026)</option>
-                    <option value="Grade 11 - Diophantus (SY 2025–2026)">Grade 11 - Diophantus (SY 2025–2026)</option>
-                    <option value="Grade 11 - Lovelace (SY 2025–2026)">Grade 11 - Lovelace (SY 2025–2026)</option>
-                </select>
+        // You can also calculate the age here since it's used later
+        $age = !empty($student->birthday) ? \Carbon\Carbon::parse($student->birthday)->age : '—';
+    @endphp
+    
+    <form action="{{ route('admin.students.update', $student->id) }}" method="POST">
+        @csrf
+        @method('PUT')
+
+        @if(session('success'))
+            <div class="bg-green-50 border-l-4 border-green-500 text-green-700 px-4 py-3 rounded-md shadow-sm mb-4">
+                <div class="flex items-center">
+                    <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
+                    <p class="text-sm font-medium">{{ session('success') }}</p>
+                </div>
             </div>
-            {{-- REVERTED: Added onclick directly back --}}
-            <button type="button" id="useProfileBtn" class="inline-flex items-center bg-[#005288] hover:bg-[#003f66] text-white font-semibold px-5 py-2.5 rounded-lg shadow-sm transition focus:ring-2 focus:ring-offset-2 focus:ring-[#005288] outline-none" onclick="triggerEnrollmentFormFiller()">
-                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                <span id="useProfileBtnText">Use Profile</span>
-            </button>
-            <button type="button" id="confirmEnrollmentBtn" class="hidden ml-3 inline-flex items-center bg-[#008000] hover:bg-[#006600] text-white font-semibold px-5 py-2.5 rounded-lg shadow-sm transition focus:ring-2 focus:ring-offset-2 focus:ring-[#008000] outline-none" onclick="confirmEnrollment()">
-                Confirm Enrollment Completed
-            </button>
-            <p class="text-xs text-gray-500 italic mt-2 ml-1">
-                This will open the LIS enrollment form with the student's saved information ready to be verified and submitted by you.
-            </p>
-            <div id="enrollmentStatus" class="mt-3 hidden p-3 rounded-lg text-sm">
-                <p id="enrollmentStatusText"></p>
+        @endif
+
+        {{-- Header Section --}}
+        <div class="bg-[#F7FBF9]/40 rounded-xl shadow-md border border-gray-100 p-5 flex justify-between items-center">
+            <div>
+                <h2 class="text-[#005288] text-2xl font-extrabold uppercase tracking-tight flex items-center gap-3">
+                    {{ $student->first_name }} {{ $student->middle_name ? substr($student->middle_name, 0, 1) . '.' : '' }} {{ $student->last_name }} {{ $student->extension_name ? $student->extension_name : '' }}
+                    
+                    @if(isset($student->is_manually_edited) && $student->is_manually_edited)
+                        <span class="text-[10px] bg-amber-100 text-amber-700 px-3 py-1 rounded-full border border-amber-200 font-black tracking-widest uppercase">
+                            Locked from Sync
+                        </span>
+                    @endif
+                </h2>
+                <h3 class="text-gray-500 text-sm font-bold uppercase tracking-tight">{{ $student->lrn }}</h3>
+            </div>
+
+            <div class="flex items-center gap-3">
+                @if(count($verifiedScans) > 0)
+                    <button type="button" onclick="toggleDocsModal()" class="flex items-center gap-2 px-4 py-2.5 bg-[#005288] text-white rounded-lg font-bold text-sm hover:bg-[#003918] transition-colors shadow-lg">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                        SCANNED DOCUMENTS
+                    </button>
+                @endif
+
+                <button type="button" @click="editing = !editing" 
+                    class="inline-flex items-center px-5 py-2.5 rounded-lg font-semibold shadow-sm transition outline-none border"
+                    :class="editing ? 'bg-gray-100 text-gray-700 border-gray-300' : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border-gray-300'">
+                    <span x-text="editing ? 'Cancel' : 'Edit Profile'"></span>
+                </button>
+                
+                <button x-show="editing" type="submit" 
+                    class="inline-flex items-center bg-[#00923F] hover:bg-[#007a34] text-white font-bold px-5 py-2.5 rounded-lg shadow-md transition outline-none">
+                    Save Changes
+                </button>
             </div>
         </div>
-    </div>
 
-    {{-- Rest of student info sections... --}}
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {{-- [SAME AS BEFORE] --}}
-        @php
-        $age = '—';
-        if (!empty($student->birthday)) {
-            try { $age = \Carbon\Carbon::parse($student->birthday)->age; } catch (\Exception $e) { $age = 'Invalid Date'; }
-        }
-        @endphp
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
 
-        @php
-            $renderFields = function($fields, $cols = 'md:grid-cols-2') {
+            @php
+            $age = '—';
+            if (!empty($student->birthday)) {
+                try { $age = \Carbon\Carbon::parse($student->birthday)->age; } catch (\Exception $e) { $age = 'Invalid Date'; }
+            }
+
+            // MODIFIED HELPER: Supports editing state and input generation
+            $renderFields = function($fields, $cols = 'md:grid-cols-2', $isJson = false) {
                 $html = "<div class='grid grid-cols-1 $cols gap-x-12 gap-y-6'>";
                 foreach ($fields as $label => $value) {
-                    $val = $value ?: '—';
+                    $rawKey = strtolower(str_replace([':', ' ', "'", '#'], ['', '_', '', 'number'], $label));
+                    $inputName = $isJson ? "responses[$rawKey]" : $rawKey;
+                    $val = $value ?: '';
+
                     $html .= "
                     <div class='relative border-b-2 border-gray-200 pb-1 group hover:border-[#005288] transition-colors duration-200'>
                         <label class='block text-[10px] font-bold text-gray-400 mb-1'>$label</label>
-                        <p class='text-[13px] uppercase text-[#003918] min-h-6'>$val</p>
+                        
+                        <p x-show='!editing' class='text-[13px] uppercase text-[#003918] min-h-6'>".($val ?: '—')."</p>
+                        
+                        <input x-show='editing' type='text' name='$inputName' value='$val' 
+                            class='w-full text-[13px] uppercase text-[#005288] bg-white/50 border-none p-0 focus:ring-0 outline-none font-bold placeholder-gray-300'
+                            placeholder='Enter $label'>
                     </div>";
                 }
                 $html .= "</div>";
                 return $html;
             };
-        @endphp
+            @endphp
 
-        <div class="lg:col-span-2 bg-[#F7FBF9]/40 rounded-xl shadow-md border border-gray-100 p-7">
-            <h2 class="text-[#005288] text-sm font-extrabold mb-4 uppercase">Learner’s Information</h2>
-            {!! $renderFields([
-                'LRN:' => $student->lrn, 'Birthdate:' => $student->birthday??'—',
-                'Last Name:' => $student->last_name??'—', 'Birthplace:' => $student->place_of_birth??'—',
-                'First Name:' => $student->first_name??'—', 'Age:' => $age,
-                'Middle Name:' => $student->middle_name??'—', 'Mother Tongue:' => $student->mother_tongue??'—',
-                'Extension:' => $student->extension_name ?? '—', 'Gender:' => $student->sex??'—',
-            ]) !!}
-        </div>
-
-        <div class="bg-[#F7FBF9]/40 rounded-xl shadow-md border border-gray-100 p-7">
-            <h2 class="text-[#005288] text-sm font-extrabold mb-4 uppercase">Enrolment</h2>
-            {!! $renderFields([
-                'School Year:' => $details['School Year'] ?? '—',
-                'Grade Level:' => $finalGrade,    
-                'Track:'       => $finalTrack,   
-                'Cluster of Electives:'    => $finalCluster,  
-                'Status:'      => $finalStatus    
-            ], 'grid-cols-1') !!}
-        </div>
-
-        <div class="lg:col-span-3 bg-[#F7FBF9]/40 rounded-xl shadow-md border border-gray-100 p-8">
-            <h2 class="text-[#005288] text-sm font-extrabold mb-4 uppercase">Current Address</h2>
-            {!! $renderFields([
-                'House #:' => $student->curr_house_number??'—', 'Street:' => $student->curr_street??'—',
-                'Barangay:' => $student->curr_barangay??'—', 'City:' => $student->curr_city??'—',
-                'Province:' => $student->curr_province??'—', 'Zip:' => $student->curr_zip_code??'—'
-            ], 'lg:grid-cols-6') !!}
-
-            <div class="flex items-center gap-3 mt-8 mb-4">
-                <h2 class="text-[#005288] text-sm font-extrabold uppercase">Permanent Address</h2>
-                @if($student->is_perm_same_as_curr)
-                    <span class="text-[9px] bg-[#f1f5fd] text-[#005288] px-2 py-0.5 rounded-full border border-[#00923F]/20 font-bold">SAME AS CURRENT</span>
-                @endif
+            {{-- Learner's Information --}}
+            <div class="lg:col-span-2 bg-[#F7FBF9]/40 rounded-xl shadow-md border border-gray-100 p-7">
+                <h2 class="text-[#005288] text-sm font-extrabold mb-4 uppercase">Learner’s Information</h2>
+                {!! $renderFields([
+                    'LRN:' => $student->lrn, 'Birthday:' => $student->birthday,
+                    'Last Name:' => $student->last_name, 'Birthplace:' => $student->place_of_birth,
+                    'First Name:' => $student->first_name, 'Age:' => $age,
+                    'Middle Name:' => $student->middle_name, 'Mother Tongue:' => $student->mother_tongue,
+                    'Extension Name:' => $student->extension_name, 'Sex:' => $student->sex,
+                ]) !!}
             </div>
-            {!! $renderFields([
-                'House #:' => $student->perm_house_number??'—', 'Street:' => $student->perm_street??'—',
-                'Barangay:' => $student->perm_barangay??'—', 'City:' => $student->perm_city??'—',
-                'Province:' => $student->perm_province??'—', 'Zip:' => $student->perm_zip_code??'—'
-            ], 'lg:grid-cols-6') !!}
-        </div>
 
-        <div class="lg:col-span-3 bg-[#F7FBF9]/40 rounded-xl shadow-md border border-gray-100 p-7 space-y-8">
-            @foreach(['Father\'s Name' => 'father', 'Mother\'s Maiden Name' => 'mother', 'Guardian\'s Name' => 'guardian'] as $title => $key)
-                <div>
-                    <h2 class="text-[#005288] text-sm font-extrabold mb-4 uppercase">{{ $title }}</h2>
-                    {!! $renderFields([
-                        'Last Name:' => $student->{$key.'_last_name'}??'—', 'First Name:' => $student->{$key.'_first_name'}??'—',
-                        'Middle Name:' => $student->{$key.'_middle_name'}??'—', 'Contact:' => $student->{$key.'_contact_number'}??'—'
-                    ], 'lg:grid-cols-4') !!}
+            {{-- Enrolment (Read Only or Sync from JSON) --}}
+            <div class="bg-[#F7FBF9]/40 rounded-xl shadow-md border border-gray-100 p-7">
+                <h2 class="text-[#005288] text-sm font-extrabold mb-4 uppercase">Enrolment</h2>
+                {!! $renderFields([
+                    'School Year:' => $details['School Year'] ?? '—',
+                    'Grade Level to Enroll:' => $finalGrade,    
+                    'Track:'       => $finalTrack,   
+                    'Cluster of Electives:'    => $finalCluster,  
+                    'Academic Status:'      => $finalStatus    
+                ], 'grid-cols-1', true) !!}
+            </div>
+
+            {{-- Address Section --}}
+            <div class="lg:col-span-3 bg-[#F7FBF9]/40 rounded-xl shadow-md border border-gray-100 p-8">
+                <h2 class="text-[#005288] text-sm font-extrabold mb-4 uppercase">Current Address</h2>
+                {!! $renderFields([
+                    'Curr House Number:' => $student->curr_house_number, 'Curr Street:' => $student->curr_street,
+                    'Curr Barangay:' => $student->curr_barangay, 'Curr City:' => $student->curr_city,
+                    'Curr Province:' => $student->curr_province, 'Curr Zip Code:' => $student->curr_zip_code
+                ], 'lg:grid-cols-6') !!}
+
+                <div class="flex items-center gap-3 mt-8 mb-4">
+                    <h2 class="text-[#005288] text-sm font-extrabold uppercase">Permanent Address</h2>
+                    @if($student->is_perm_same_as_curr)
+                        <span class="text-[9px] bg-[#f1f5fd] text-[#005288] px-2 py-0.5 rounded-full border border-[#00923F]/20 font-bold">SAME AS CURRENT</span>
+                    @endif
                 </div>
-            @endforeach
+                {!! $renderFields([
+                    'Perm House Number:' => $student->perm_house_number, 'Perm Street:' => $student->perm_street,
+                    'Perm Barangay:' => $student->perm_barangay, 'Perm City:' => $student->perm_city,
+                    'Perm Province:' => $student->perm_province, 'Perm Zip Code:' => $student->perm_zip_code
+                ], 'lg:grid-cols-6') !!}
+            </div>
+
+            {{-- Family Information --}}
+            <div class="lg:col-span-3 bg-[#F7FBF9]/40 rounded-xl shadow-md border border-gray-100 p-7 space-y-8">
+                @foreach(['Father' => 'father', 'Mother' => 'mother', 'Guardian' => 'guardian'] as $title => $key)
+                    <div>
+                        <h2 class="text-[#005288] text-sm font-extrabold mb-4 uppercase">{{ $title }}'s Information</h2>
+                        {!! $renderFields([
+                            "$title Last Name:" => $student->{$key.'_last_name'}, 
+                            "$title First Name:" => $student->{$key.'_first_name'},
+                            "$title Middle Name:" => $student->{$key.'_middle_name'}, 
+                            "$title Contact Number:" => $student->{$key.'_contact_number'}
+                        ], 'lg:grid-cols-4') !!}
+                    </div>
+                @endforeach
+            </div>
+
+            {{-- Additional Info --}}
+            @if(!empty($dynamicDetails))
+                @php
+                    // 1. Keep the blocklist for Enrolment/Transferee
+                    $alreadyRendered = [
+                        'school_year', 'grade_level_to_enroll', 'track', 'cluster_of_electives', 'academic_status',
+                        'last_school_year_completed', 'last_grade_level_completed', 'last_school_attended', 'school_id'
+                    ];
+                    
+                    // 2. Add a tracker to prevent internal redundancy (Snake case vs Title case)
+                    $displayedSanitizedKeys = [];
+                @endphp
+
+                <div class="lg:col-span-3 bg-[#F7FBF9]/40 rounded-xl shadow-md border border-gray-100 p-7">
+                    <h2 class="text-[#005288] text-sm font-extrabold mb-4 uppercase">Additional Information</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-x-12 gap-y-6">
+                        @foreach($dynamicDetails as $question => $answer)
+                            @php 
+                                // Sanitize the current question/key
+                                $rawName = strtolower(str_replace([':', ' ', "'", '#'], ['', '_', '', 'number'], $question)); 
+                            @endphp
+
+                            {{-- Skip if it's in the Enrolment/Transferee blocklist --}}
+                            @if(in_array($rawName, $alreadyRendered))
+                                @continue
+                            @endif
+
+                            {{-- Skip if we have already displayed a version of this field in this loop --}}
+                            @if(in_array($rawName, $displayedSanitizedKeys))
+                                @continue
+                            @endif
+
+                            {{-- Record this key as "displayed" --}}
+                            @php $displayedSanitizedKeys[] = $rawName; @endphp
+
+                            <div class="relative border-b-2 border-gray-200 pb-1 ...">
+                                <label class="block text-[10px] font-bold text-gray-400 mb-1">
+                                    {{-- Make the label pretty even if the key is snake_case --}}
+                                    {{ ucwords(str_replace('_', ' ', $question)) }}
+                                </label>
+                                
+                                <p x-show="!editing" class="text-[13px] uppercase text-[#003918] min-h-6">{{ $answer ?: '—' }}</p>
+                                
+                                <input x-show="editing" type="text" name="responses[{{ $rawName }}]" value="{{ $answer }}" 
+                                    class="w-full text-[13px] uppercase text-[#005288] ...">
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
+            {{-- Special Info --}}
+            @php
+                $status = trim($details['Academic Status'] ?? '');
+                $isSpecialStatus = str_contains(strtolower($status), 'feree') || str_contains(strtolower($status), 'balik');
+            @endphp
+
+            @if($isSpecialStatus)
+                <div class="lg:col-span-3 bg-[#F7FBF9]/40 rounded-xl shadow-md border border-gray-100 p-7">
+                    <h2 class="text-[#005288] text-sm font-extrabold uppercase mb-4">Transferee / Balik-Aral Information</h2>
+                    {!! $renderFields([
+                        'Last School Year Completed:' => $details['Last School Year Completed'] ?? '—',
+                        'Last Grade Level Completed:' => $details['Last Grade Level Completed'] ?? '—',
+                        'Last School Attended:'       => $details['Last School Attended'] ?? '—',
+                        'School ID:'                  => $details['School ID'] ?? '—',
+                    ], 'lg:grid-cols-4', true) !!}
+                </div>
+            @endif
         </div>
 
-        @if(!empty($dynamicDetails))
-            <div class="lg:col-span-3 bg-[#F7FBF9]/40 rounded-xl shadow-md border border-gray-100 p-7">
-                <h2 class="text-[#005288] text-sm font-extrabold mb-4 uppercase">Additional Information</h2>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-x-12 gap-y-6">
-                    @foreach($dynamicDetails as $question => $answer)
-                        @php
-                            $answerText = '—';
-                            if (is_array($answer)) {
-                                $answerText = json_encode($answer, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-                            } elseif (!empty($answer) || $answer === '0' || $answer === 0) {
-                                $answerText = $answer;
-                            }
-                        @endphp
-                        <div class="relative border-b-2 border-gray-200 pb-1 group hover:border-[#005288] transition-colors duration-200">
-                            <label class="block text-[10px] font-bold text-gray-400 mb-1">{{ $question }}</label>
-                            <p class="text-[13px] uppercase text-[#003918] min-h-6">{{ $answerText }}</p>
+        {{-- Sticky Bottom Save Button --}}
+        <div x-show="editing" class="flex justify-end pt-6 pb-10" x-transition>
+            <button type="submit" class="bg-[#00923F] hover:bg-[#007a34] text-white font-bold px-12 py-4 rounded-xl shadow-lg transition transform hover:scale-105 outline-none flex items-center gap-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                Finalize & Save Changes
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- Documents Modal -->
+<div id="docsModal" class="fixed inset-0 z-50 hidden overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+    <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true" onclick="toggleDocsModal()"></div>
+        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+        
+        <div class="inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl w-full border border-gray-200">
+            <div class="bg-white px-6 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div class="flex justify-between items-center border-b border-gray-100 pb-4 mb-4">
+                    <h3 class="text-xl leading-6 font-black text-[#003918] uppercase tracking-tighter" id="modal-title">
+                        Verified Documents
+                    </h3>
+                    <button onclick="toggleDocsModal()" class="text-gray-400 hover:text-red-500 transition-colors">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    @foreach($verifiedScans as $scan)
+                        <div class="bg-gray-50 rounded-xl border border-gray-200 overflow-hidden shadow-sm group">
+                            <div class="p-3 bg-white border-b border-gray-100 flex justify-between items-center">
+                                <span class="text-xs font-bold text-[#005288] uppercase tracking-wider">{{ $scan->document_type }}</span>
+                                <span class="text-[10px] text-gray-400 font-medium">{{ \Carbon\Carbon::parse($scan->created_at)->format('M d, Y') }}</span>
+                            </div>
+                            <div class="relative aspect-[3/4] bg-gray-200 overflow-hidden cursor-zoom-in" onclick="window.open('{{ asset('storage/' . $scan->file_path) }}', '_blank')">
+                                <img src="{{ asset('storage/' . $scan->file_path) }}" alt="{{ $scan->document_type }}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
+                                <div class="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                                    <span class="bg-white/90 text-[#005288] px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg">Click to Enlarge</span>
+                                </div>
+                            </div>
                         </div>
                     @endforeach
                 </div>
             </div>
-        @endif
-
-        @php
-            $status = trim($details['Academic Status'] ?? '');
-            $isSpecialStatus = str_contains(strtolower($status), 'feree') || str_contains(strtolower($status), 'balik');
-        @endphp
-
-        @if($isSpecialStatus)
-            <div class="lg:col-span-3 bg-[#F7FBF9]/40 rounded-xl shadow-md border border-gray-100 p-7">
-                <div class="flex items-center gap-2 mb-4">
-                    <h2 class="text-[#005288] text-sm font-extrabold uppercase">Transferee / Balik-Aral Information</h2>
-                </div>
-                {!! $renderFields([
-                    'Last School Year Completed:' => $details['Last School Year Completed'] ?? '—',
-                    'Last Grade Level Completed:' => $details['Last Grade Level Completed'] ?? '—',
-                    'Last School Attended:'       => $details['Last School Attended'] ?? '—',
-                    'School ID:'                  => $details['School ID'] ?? '—',
-                ], 'lg:grid-cols-4') !!}
+            <div class="bg-gray-50 px-6 py-4 sm:flex sm:flex-row-reverse">
+                <button type="button" onclick="toggleDocsModal()" class="w-full inline-flex justify-center rounded-lg border border-gray-300 shadow-sm px-5 py-2.5 bg-white text-xs font-black uppercase tracking-widest text-gray-700 hover:bg-gray-100 transition-colors focus:outline-none sm:w-auto">
+                    Close
+                </button>
             </div>
-        @endif
+        </div>
     </div>
-
-    <div class="flex justify-end pt-6 pb-10">
-        <button type="button" class="inline-flex items-center bg-[#00923F] hover:bg-[#007a34] text-white font-semibold px-8 py-3 rounded-lg shadow-sm transition focus:ring-2 focus:ring-offset-2 focus:ring-[#00923F] outline-none">
-            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
-            Save Changes
-        </button>
-    </div>
-
 </div>
 
-{{-- Enhanced script with better error handling and debugging --}}
 <script>
-    const SERVICE_URL = 'http://127.0.0.1:5002';
-    
-    async function triggerEnrollmentFormFiller() {
-        console.log('%c[DEBUG] Button clicked - Starting enrollment process', 'color: blue; font-weight: bold;');
-        
-        const btn = document.getElementById('useProfileBtn');
-        const btnText = document.getElementById('useProfileBtnText');
-        const statusDiv = document.getElementById('enrollmentStatus');
-        const statusText = document.getElementById('enrollmentStatusText');
-        const confirmBtn = document.getElementById('confirmEnrollmentBtn');
-        const sectionSelect = document.getElementById('sectionSelect');
-        const section = sectionSelect.value;
-        
-        // Validate section selection
-        if (!section) {
-            console.warn('[VALIDATION] No section selected');
-            statusDiv.classList.remove('hidden', 'bg-green-50', 'text-green-700', 'border', 'border-green-200');
-            statusDiv.classList.add('bg-red-50', 'text-red-700', 'border', 'border-red-200');
-            statusText.innerHTML = '<strong>Error:</strong> Please select a section from the dropdown above.';
-            return;
-        }
-        
-        console.log(`[INFO] Section selected: ${section}`);
-        localStorage.setItem('serbiskoSelectedSection', section);
-        
-        // Disable button and show loading state
-        btn.disabled = true;
-        btn.classList.add('opacity-50', 'cursor-not-allowed');
-        btnText.textContent = 'Checking service...';
-        
-        // Step 1: Check if service is running
-        console.log(`[NETWORK] Checking service at ${SERVICE_URL}/status`);
-        try {
-            const statusResp = await fetch(`${SERVICE_URL}/status`, {
-                method: 'GET',
-                signal: AbortSignal.timeout(5000) // 5 second timeout
-            });
-            if (!statusResp.ok) {
-                throw new Error(`HTTP ${statusResp.status}`);
-            }
-            const statusData = await statusResp.json();
-            console.log('[SERVICE] Service is online:', statusData);
-        } catch (err) {
-            console.error('%c[ERROR] Service unavailable', 'color: red; font-weight: bold;', err.message);
-            statusDiv.classList.remove('hidden', 'bg-green-50', 'text-green-700', 'border', 'border-green-200');
-            statusDiv.classList.add('bg-red-50', 'text-red-700', 'border', 'border-red-200');
-            statusText.innerHTML = `
-                <strong>⚠️ Service Error:</strong> Cannot connect to enrollment service.<br>
-                <small style="display: block; margin-top: 8px;">
-                  Please ensure:<br>
-                  • The enrollment filler service is running on port 5002<br>
-                  • Run: <code style="background: #f0f0f0; padding: 2px 4px;">python3 enrollment_form_filler.py</code> in the python_services folder
-                </small>
-            `;
-            resetButton(btn, btnText);
-            return;
-        }
-        
-        // Step 2: Prepare student data
-        console.log('[DATA] Preparing student data...');
-        const studentData = {
-            lrn: '{{ $student->lrn }}',
-            first_name: '{{ $student->first_name }}',
-            last_name: '{{ $student->last_name }}',
-            middle_name: '{{ $student->middle_name ?? "" }}',
-            extension_name: '{{ $student->extension_name ?? "" }}',
-            birthday: '{{ $student->birthday ?? "" }}',
-            sex: '{{ $student->sex ?? "" }}',
-            mother_tongue: '{{ $student->mother_tongue ?? "" }}',
-            place_of_birth: '{{ $student->place_of_birth ?? "" }}',
-            contact_number: '{{ $student->contact_number ?? "" }}',
-            curr_house_number: '{{ $student->curr_house_number ?? "" }}',
-            curr_street: '{{ $student->curr_street ?? "" }}',
-            curr_barangay: '{{ $student->curr_barangay ?? "" }}',
-            curr_city: '{{ $student->curr_city ?? "" }}',
-            curr_province: '{{ $student->curr_province ?? "" }}',
-            curr_zip_code: '{{ $student->curr_zip_code ?? "" }}',
-            grade_level: '{{ $finalGrade ?? "" }}',
-            track: '{{ $finalTrack ?? "" }}',
-            cluster: '{{ $finalCluster ?? "" }}',
-            academic_status: '{{ $finalStatus ?? "" }}',
-            section: section
-        };
-        console.log('[DATA] Student:', studentData.first_name, studentData.last_name, 'LRN:', studentData.lrn);
-        
-        // Step 3: Send request to start enrollment automation
-        btnText.textContent = 'Starting automation...';
-        console.log(`[NETWORK] Sending POST to ${SERVICE_URL}/fill-enrollment`);
-        try {
-            const response = await fetch(`${SERVICE_URL}/fill-enrollment`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(studentData),
-                signal: AbortSignal.timeout(10000) // 10 second timeout
-            });
-            
-            console.log(`[RESPONSE] Got status ${response.status} from server`);
-            const result = await response.json();
-            console.log('[RESPONSE] Server response:', result);
-            
-            if (response.ok && result.status === 'started') {
-                console.log('%c[SUCCESS] Automation started successfully!', 'color: green; font-weight: bold;');
-                statusDiv.classList.remove('hidden', 'bg-red-50', 'text-red-700', 'border', 'border-red-200');
-                statusDiv.classList.add('bg-green-50', 'text-green-700', 'border', 'border-green-200');
-                statusText.innerHTML = `
-                    <strong>✓ Success!</strong> Form automation is running.<br>
-                    <small style="display: block; margin-top: 8px;">
-                      A new Chrome window should open automatically. The form will be filled with ${studentData.first_name}'s information.<br>
-                      Once you verify everything is correct, click <strong>Confirm Enrollment Completed</strong>.
-                    </small>
-                `;
-                btnText.textContent = 'Form Filler Active';
-                confirmBtn.classList.remove('hidden');
-            } else {
-                console.error('[ERROR] Server returned failure:', result);
-                throw new Error(result.message || 'Server returned an error');
-            }
-        } catch (error) {
-            console.error('%c[ERROR] Failed to start automation', 'color: red; font-weight: bold;', error);
-            statusDiv.classList.remove('hidden', 'bg-green-50', 'text-green-700', 'border', 'border-green-200');
-            statusDiv.classList.add('bg-red-50', 'text-red-700', 'border', 'border-red-200');
-            
-            let errorMsg = error.message;
-            if (error.name === 'AbortError') {
-                errorMsg = 'Request timeout - service took too long to respond';
-            } else if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
-                errorMsg = 'Network error - cannot connect to service (CORS or connection issue)';
-            }
-            
-            statusText.innerHTML = `<strong>⚠️ Error:</strong> ${errorMsg}<br><small style="display: block; margin-top: 8px;">Check browser console (F12) for more details.</small>`;
-            resetButton(btn, btnText);
-        }
+    function toggleDocsModal() {
+        const modal = document.getElementById('docsModal');
+        modal.classList.toggle('hidden');
     }
-    
-    function resetButton(btn, btnText) {
-        btn.disabled = false;
-        btn.classList.remove('opacity-50', 'cursor-not-allowed');
-        btnText.textContent = 'Use Profile';
-    }
-
-    async function confirmEnrollment() {
-        console.log('[DEBUG] Confirming enrollment...');
-        const confirmBtn = document.getElementById('confirmEnrollmentBtn');
-        const statusDiv = document.getElementById('enrollmentStatus');
-        const statusText = document.getElementById('enrollmentStatusText');
-        confirmBtn.disabled = true;
-        confirmBtn.textContent = 'Confirming...';
-
-        try {
-            // Close the LIS session
-            console.log('[NETWORK] Sending confirm request to service');
-            await fetch(`${SERVICE_URL}/confirm-enrollment`, {method: 'POST'});
-            
-            // Update database
-            console.log('[NETWORK] Updating database');
-            await fetch('{{ url("/admin/students/profile/" . $student->lrn . "/confirm-enrollment") }}', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                }
-            });
-            
-            console.log('%c[SUCCESS] Enrollment confirmed!', 'color: green; font-weight: bold;');
-            statusDiv.classList.remove('bg-red-50');
-            statusDiv.classList.add('bg-green-50', 'text-green-700');
-            statusText.innerHTML = `<strong>✓ Success!</strong> Enrollment has been confirmed and saved.`;
-            confirmBtn.classList.add('hidden');
-        } catch (error) {
-            console.error('[ERROR] Confirmation failed:', error);
-            confirmBtn.disabled = false;
-            confirmBtn.textContent = 'Confirm Enrollment Completed';
-            statusText.innerHTML = `<strong>⚠️ Error confirming enrollment:</strong> ${error.message}`;
-        }
-    }
-    
-    // Log that scripts are loaded
-    console.log('%c[READY] Enrollment form controller loaded and ready', 'color: green; font-weight: bold;');
-
-    // Restore section on load
-    window.onload = () => {
-        const saved = localStorage.getItem('serbiskoSelectedSection');
-        if (saved) document.getElementById('sectionSelect').value = saved;
-    };
 </script>
 @endsection

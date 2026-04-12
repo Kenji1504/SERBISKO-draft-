@@ -17,7 +17,7 @@ CORS(app)
 
 # CONFIG
 LIS_URL = "https://learner-information-system-dashboard-540972607515.us-west1.run.app/"
-CREDS = ("gamboakenleam1015@gmail.com", "password432")
+CREDS = ("depedsample@gmail.com", "deped123")
 
 def run_check(lrn, expected_grade, webhook, scan_id):
     print(f"[*] Verifying LRN: {lrn}. Looking for: {expected_grade} completer.")

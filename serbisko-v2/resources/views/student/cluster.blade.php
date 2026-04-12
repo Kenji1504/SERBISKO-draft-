@@ -22,9 +22,9 @@
         <p class="text-gray-600">Choose the specialization that best fits your goals.</p>
     </div>
 
-    <form action="{{ url('/student/save-cluster') }}" method="POST" class="w-full max-w-5xl">
+    <form action="{{ url('/student/save-cluster') }}" method="POST" class="w-full max-w-6xl">
         @csrf
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+        <div class="flex flex-wrap justify-center gap-6 mb-12">
             
             @php
                 $track = session('track', 'academic');
@@ -43,7 +43,7 @@
             @endphp
 
             @foreach($clusters as $cluster)
-            <label class="cursor-pointer group">
+            <label class="cursor-pointer group w-full md:w-64">
                 <input type="radio" name="cluster" value="{{ $cluster['id'] }}" class="peer sr-only" required>
                 <div class="h-48 bg-white rounded-3xl shadow-sm border-4 border-transparent peer-checked:border-blue-900 flex items-center justify-center p-6 text-center transition-all transform hover:-translate-y-2">
                     <span class="text-xl font-bold text-gray-800 group-hover:text-blue-900">

@@ -10,11 +10,7 @@ class SuperAdminSeeder extends Seeder
 {
     public function run(): void
     {
-        User::updateOrCreate([
-            'first_name'     => 'Super',
-            'last_name'      => 'Admin',
-            'birthday'       => '2000-01-01',
-        ], [
+        User::create([
             'first_name'     => 'Super',
             'last_name'      => 'Admin',
             'middle_name'    => null,

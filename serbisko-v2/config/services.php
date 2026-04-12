@@ -35,8 +35,8 @@ return [
         ],
     ],
 
-    'gemini' => [
-        'api_key' => env('GEMINI_API_KEY'),
+    'google' => [
+    'service_account_email' => env('GOOGLE_SERVICE_ACCOUNT_EMAIL', 'your-default-email@iam.gserviceaccount.com'),
     ],
 
 ];

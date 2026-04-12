@@ -10,7 +10,7 @@ app = Flask(__name__)
 CORS(app)
 
 print("\n" + "="*50)
-print("[SYSTEM] OCR ENGINE v5.1 ONLINE!")
+print("🟢 [SYSTEM] OCR ENGINE v5.1 ONLINE!")
 print("STRICT VERIFICATION: 55% THRESHOLD ENABLED")
 print("="*50 + "\n")
 
@@ -58,11 +58,21 @@ def ocr():
 
     try:
         file = request.files['image']
-        img = cv2.imdecode(np.frombuffer(file.read(), np.uint8), cv2.IMREAD_COLOR)
+        img_bytes = file.read()
+        img = cv2.imdecode(np.frombuffer(img_bytes, np.uint8), cv2.IMREAD_COLOR)
         
-        # Pre-processing
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        processed = cv2.convertScaleAbs(gray, alpha=1.3, beta=10)
+        if img is None:
+            print("❌ Error: Could not decode image.")
+            return jsonify({'success': False, 'error': 'Invalid image format or corrupted file.'}), 400
+
+        # --- ENHANCED PRE-PROCESSING ---
+        # 1. Sharpening (Helps with text clarity)
+        kernel = np.array([[-1,-1,-1], [-1,9,-1], [-1,-1,-1]])
+        sharpened = cv2.filter2D(img, -1, kernel)
+        
+        # 2. Grayscale & Contrast
+        gray = cv2.cvtColor(sharpened, cv2.COLOR_BGR2GRAY)
+        processed = cv2.convertScaleAbs(gray, alpha=1.5, beta=0) # Slightly higher contrast
 
         # Sequential Scanning (Stop early if document type is found)
         best_text = ""

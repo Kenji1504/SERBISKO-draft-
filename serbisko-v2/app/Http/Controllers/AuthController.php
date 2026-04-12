@@ -86,9 +86,13 @@ class AuthController extends Controller
         }
         
         // Check for existing enrollment to determine redirect
-        $hasEnrollment = \Illuminate\Support\Facades\DB::table('kiosk_enrollments')
-            ->where('id', $user->id)
-            ->exists();
+        $student = $user->student;
+        $hasEnrollment = false;
+        if ($student) {
+            $hasEnrollment = \Illuminate\Support\Facades\DB::table('kiosk_enrollments')
+                ->where('student_id', $student->id)
+                ->exists();
+        }
 
         return $hasEnrollment 
             ? redirect('/student/checklist') 

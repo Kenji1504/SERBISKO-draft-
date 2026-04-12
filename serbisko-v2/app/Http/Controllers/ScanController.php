@@ -7,9 +7,15 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
+use App\Models\Student;
 
 class ScanController extends Controller
 {
+    private function getStudentId($userId) {
+        $student = Student::where('user_id', $userId)->first();
+        return $student ? $student->id : null;
+    }
+
     private function getPrefix($docType) {
         $lowerDoc = strtolower($docType);
         if (str_contains($lowerDoc, 'report') || str_contains($lowerDoc, 'sf9')) return 'sf9';
@@ -22,6 +28,44 @@ class ScanController extends Controller
         return 'sf9'; // Fallback
     }
 
+    private function triggerArduinoSuccess() {
+        try {
+            // 1. Close Slot (F)
+            Http::timeout(3)->post('http://127.0.0.1:51234/api/door', ['action' => 'close']);
+            
+            // 2. Trigger Conveyor Belt (w)
+            // Note: arduino_server.py might need a /api/conveyor/w endpoint 
+            // but for now we'll use the existing send_command logic if possible 
+            // or just hit a generic endpoint that we'll add.
+            Http::timeout(3)->post('http://127.0.0.1:51234/api/conveyor/w');
+            
+            Log::info("Arduino Success commands (F + w) sent.");
+        } catch (\Exception $e) {
+            Log::error("Arduino Success Trigger failed: " . $e->getMessage());
+        }
+    }
+
+    public function triggerSorting(Request $request) {
+        $cluster = $request->input('cluster');
+        if (!$cluster) return response()->json(['error' => 'No cluster provided'], 400);
+
+        try {
+            Http::timeout(3)->post('http://127.0.0.1:51234/api/strand/' . $cluster);
+            return response()->json(['success' => true]);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    public function stopConveyor() {
+        try {
+            Http::timeout(3)->post('http://127.0.0.1:51234/api/conveyor/stop');
+            return response()->json(['success' => true]);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
     public function processDocument(Request $request)
     {
         try {
@@ -30,8 +74,9 @@ class ScanController extends Controller
             $imageData = $request->input('image_data');
             $docType = $request->input('document_type', 'Report Card (SF9)');
             $userId = session('user_id', 1);
+            $studentId = $this->getStudentId($userId);
 
-            Log::info("--- START processDocument ---", ['userId' => $userId, 'docType' => $docType]);
+            Log::info("--- START processDocument ---", ['userId' => $userId, 'studentId' => $studentId, 'docType' => $docType]);
 
             if (!$imageData || strpos($imageData, ';base64,') === false) {
                 return response()->json(['status' => 'error', 'message' => 'Image data is invalid.']);
@@ -48,13 +93,29 @@ class ScanController extends Controller
 
             Storage::disk('public')->put($filePath, $imageBase64);
             $imageFullPath = storage_path('app/public/' . $filePath);
+            Log::info("Image saved locally", ['path' => $imageFullPath]);
+
+            // Track scan in history
+            $scanId = DB::table('scans')->insertGetId([
+                'user_id' => $userId,
+                'document_type' => $docType,
+                'file_path' => $filePath,
+                'status' => 'pending',
+                'remarks' => 'Processing...',
+                'created_at' => now(),
+                'updated_at' => now()
+            ]);
 
             $prefix = $this->getPrefix($docType);
+            Log::info("Using prefix", ['prefix' => $prefix]);
+
+            $student = Student::find($studentId);
 
             // Update Kiosk Enrollment with the new file path and initial status
             DB::table('kiosk_enrollments')->updateOrInsert(
-                ['id' => $userId],
+                ['student_id' => $studentId],
                 [
+                    'student_lrn' => $student->lrn ?? null,
                     "{$prefix}_path" => $filePath,
                     "{$prefix}_status" => 'pending',
                     "{$prefix}_remarks" => 'Processing...',
@@ -64,17 +125,18 @@ class ScanController extends Controller
                     'updated_at' => now()
                 ]
             );
+            Log::info("Database updated with 'pending' status");
 
             // --- HELPER: Handles failures and checks for 3rd strike ---
-            $handleFailure = function($remarks) use ($userId, $docType, $prefix) {
-                $enrollment = DB::table('kiosk_enrollments')->where('id', $userId)->first();
+            $handleFailure = function($remarks) use ($studentId, $docType, $prefix, $scanId) {
+                $enrollment = DB::table('kiosk_enrollments')->where('student_id', $studentId)->first();
                 $attemptsCol = "{$prefix}_attempts";
                 $newAttempts = ($enrollment->$attemptsCol ?? 0) + 1;
 
                 $status = ($newAttempts >= 3) ? 'manual_verification' : 'failed';
                 $finalRemarks = ($newAttempts >= 3) ? 'Sent to Admin for Manual Verification.' : $remarks;
 
-                DB::table('kiosk_enrollments')->where('id', $userId)->update([
+                DB::table('kiosk_enrollments')->where('student_id', $studentId)->update([
                     "{$prefix}_status" => $status,
                     "{$prefix}_remarks" => $finalRemarks,
                     "{$prefix}_attempts" => $newAttempts,
@@ -82,7 +144,14 @@ class ScanController extends Controller
                     'latest_scan_remarks' => $finalRemarks
                 ]);
 
-                Log::warning("Failure handled", ['userId' => $userId, 'attempts' => $newAttempts, 'status' => $status]);
+                // Update the scan history record too
+                DB::table('scans')->where('id', $scanId)->update([
+                    'status' => $status,
+                    'remarks' => $finalRemarks,
+                    'updated_at' => now()
+                ]);
+
+                Log::warning("Failure handled", ['studentId' => $studentId, 'attempts' => $newAttempts, 'status' => $status]);
                 return ['is_strike_3' => ($newAttempts >= 3), 'count' => $newAttempts];
             };
 
@@ -104,7 +173,7 @@ class ScanController extends Controller
             Log::info("Sending to OCR Server", ['url' => 'http://127.0.0.1:9001/ocr']);
 
             try {
-                $ocrResponse = Http::timeout(180)
+                $ocrResponse = Http::timeout(300)
                     ->attach('image', file_get_contents($imageFullPath), $fileName)
                     ->post('http://127.0.0.1:9001/ocr', [
                         'doc_type'   => $pythonDocType,
@@ -134,7 +203,7 @@ class ScanController extends Controller
                     if ($lrn && $isReportCard) {
                         Log::info("LRN Found & Doc is Report Card. Preparing LIS call.");
                         
-                        DB::table('kiosk_enrollments')->where('id', $userId)->update([
+                        DB::table('kiosk_enrollments')->where('student_id', $studentId)->update([
                             'sf9_lrn' => $lrn, 
                             'sf9_remarks' => 'Sending to LIS...',
                             'student_lrn' => $lrn,
@@ -144,7 +213,7 @@ class ScanController extends Controller
                         
                         $enrollingGrade = session('grade_level');
                         if (!$enrollingGrade) {
-                            $enrollingGrade = DB::table('kiosk_enrollments')->where('id', $userId)->value('grade_level') ?? '11'; 
+                            $enrollingGrade = DB::table('kiosk_enrollments')->where('student_id', $studentId)->value('grade_level') ?? '11'; 
                         }
                         $expectedGrade = ($enrollingGrade == '12') ? 'Grade 11' : 'Grade 10';
 
@@ -171,13 +240,16 @@ class ScanController extends Controller
                         }
                     } else {
                         Log::info("Document verified without LIS (Non-Report Card or missing LRN)");
-                        DB::table('kiosk_enrollments')->where('id', $userId)->update([
+                        DB::table('kiosk_enrollments')->where('student_id', $studentId)->update([
                             "{$prefix}_status" => 'verified',
                             "{$prefix}_remarks" => 'Verified',
                             'latest_scan_status' => 'verified',
                             'latest_scan_remarks' => 'Verified',
                             'updated_at' => now()
                         ]);
+
+                        // Trigger Arduino SUCCESS (Close + w)
+                        $this->triggerArduinoSuccess();
                     }
                 }
 
@@ -206,16 +278,17 @@ class ScanController extends Controller
         Log::info("LIS Callback received", ['userId' => $userId, 'status' => $status]);
 
         if ($userId && $status) {
+            $studentId = $this->getStudentId($userId);
             $finalStatus = ($status === 'verified_lis') ? 'verified' : 'failed';
             
             if ($finalStatus === 'failed') {
-                $enrollment = DB::table('kiosk_enrollments')->where('id', $userId)->first();
+                $enrollment = DB::table('kiosk_enrollments')->where('student_id', $studentId)->first();
                 $newAttempts = ($enrollment->sf9_attempts ?? 0) + 1;
                 
                 $dbStatus = ($newAttempts >= 3) ? 'manual_verification' : 'failed';
                 $remarks = ($newAttempts >= 3) ? 'Sent to Admin for Manual Verification.' : 'LIS Verification Failed.';
 
-                DB::table('kiosk_enrollments')->where('id', $userId)->update([
+                DB::table('kiosk_enrollments')->where('student_id', $studentId)->update([
                     'sf9_status' => $dbStatus,
                     'sf9_remarks' => $remarks,
                     'sf9_attempts' => $newAttempts,
@@ -224,13 +297,16 @@ class ScanController extends Controller
                     'updated_at' => now()
                 ]);
             } else {
-                DB::table('kiosk_enrollments')->where('id', $userId)->update([
+                DB::table('kiosk_enrollments')->where('student_id', $studentId)->update([
                     'sf9_status' => 'verified',
                     'sf9_remarks' => 'Verified',
                     'latest_scan_status' => 'verified',
                     'latest_scan_remarks' => 'Verified',
                     'updated_at' => now()
                 ]);
+
+                // Trigger Arduino SUCCESS (Close + w)
+                $this->triggerArduinoSuccess();
             }
             return response()->json(['success' => true]);
         }
@@ -242,7 +318,8 @@ class ScanController extends Controller
         $userId = session('user_id');
         if (!$userId) return response()->json(['status' => 'error', 'message' => 'Session expired.']);
 
-        $enrollment = DB::table('kiosk_enrollments')->where('id', $userId)->first();
+        $studentId = $this->getStudentId($userId);
+        $enrollment = DB::table('kiosk_enrollments')->where('student_id', $studentId)->first();
 
         if (!$enrollment) return response()->json(['status' => 'pending']);
 
@@ -260,6 +337,57 @@ class ScanController extends Controller
         ]);
     }
 
+    public function checkRejection(Request $request) {
+        $userId = session('user_id');
+        if (!$userId) return response()->json(['rejected' => false]);
+
+        try {
+            $response = Http::timeout(2)->get('http://127.0.0.1:51234/api/sensor/check-rejection');
+            $data = $response->json();
+
+            if (isset($data['rejected']) && $data['rejected'] === true) {
+                $docType = session('current_doc', 'Unknown Document');
+                Log::warning("PAPER_REJECTED detected for User {$userId}, Doc: {$docType}");
+
+                // Update kiosk_enrollments with rejection info
+                $studentId = $this->getStudentId($userId);
+                $enrollment = DB::table('kiosk_enrollments')->where('student_id', $studentId)->first();
+                $rejectedPapers = json_decode($enrollment->rejected_papers ?? '[]', true);
+                
+                // --- DUPLICATE CHECK ---
+                // Only add if not already recorded within the last 15 seconds for this doc type
+                $alreadyExists = false;
+                foreach ($rejectedPapers as $rej) {
+                    if ($rej['document_type'] === $docType) {
+                        $diff = abs(now()->diffInSeconds(\Carbon\Carbon::parse($rej['rejected_at'])));
+                        if ($diff < 15) {
+                            $alreadyExists = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (!$alreadyExists) {
+                    $rejectedPapers[] = [
+                        'document_type' => $docType,
+                        'rejected_at' => now()->toDateTimeString(),
+                        'prefix' => $this->getPrefix($docType)
+                    ];
+
+                    DB::table('kiosk_enrollments')->where('student_id', $studentId)->update([
+                        'rejected_papers' => json_encode($rejectedPapers)
+                    ]);
+                }
+
+                return response()->json(['rejected' => true]);
+            }
+        } catch (\Exception $e) {
+            Log::error("Error checking rejection from Arduino: " . $e->getMessage());
+        }
+
+        return response()->json(['rejected' => false]);
+    }
+
     private function getNextUrl($userId) {
         $selectedDocs = session('docs_to_scan', []);
         $currentDoc = session('current_doc');
@@ -268,12 +396,34 @@ class ScanController extends Controller
             $currentIndex = array_search($currentDoc, $selectedDocs);
             if ($currentIndex !== false && isset($selectedDocs[$currentIndex + 1])) {
                 $nextDoc = $selectedDocs[$currentIndex + 1];
-                session(['current_doc' => $nextDoc]);
+                // Do NOT update session(['current_doc']) here! 
+                // Let the capture controller update it when they land on the page.
                 return '/student/capture?doc=' . urlencode($nextDoc);
             }
         }
 
-        // If no more selected docs, go back to the Checklist (where they can see status)
+        // Check if EVERYTHING required for their status is verified
+        $studentId = $this->getStudentId($userId);
+        $enrollment = DB::table('kiosk_enrollments')->where('student_id', $studentId)->first();
+        if ($enrollment) {
+            $enrollController = new \App\Http\Controllers\EnrollmentController();
+            $requiredDocs = $enrollController->getRequiredDocs($enrollment->academic_status);
+            
+            $allVerified = true;
+            foreach ($requiredDocs as $label => $prefix) {
+                $statusCol = $prefix . '_status';
+                $status = $enrollment->$statusCol ?? 'pending';
+                if ($status !== 'verified' && $status !== 'manual_verification') {
+                    $allVerified = false;
+                    break;
+                }
+            }
+
+            if ($allVerified) {
+                return '/student/thankyou';
+            }
+        }
+
         return '/student/checklist';
     }
 }

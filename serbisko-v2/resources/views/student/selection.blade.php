@@ -59,7 +59,10 @@
 
         </div>
 
-        <div class="flex justify-center">
+        <div class="flex justify-center gap-6">
+            <a href="{{ url('/student/status') }}" class="bg-white border-2 border-blue-900 text-blue-900 font-bold text-lg px-12 py-3 rounded-full hover:bg-gray-50 transition transform hover:scale-105">
+                BACK
+            </a>
             <button type="button" onclick="validateAndSubmit()" class="bg-blue-900 text-white font-bold text-lg px-16 py-4 rounded-full shadow-lg hover:bg-blue-800 transition transform hover:scale-105">
                 NEXT
             </button>

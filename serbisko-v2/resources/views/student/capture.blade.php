@@ -104,8 +104,8 @@
 
         <div class="relative">
             <div class="bg-black rounded-3xl overflow-hidden shadow-2xl border-4 border-blue-900 aspect-video relative group">
-                <video id="camera-stream" autoplay playsinline class="w-full h-full object-cover"></video>
-                <canvas id="capture-canvas" class="hidden w-full h-full object-cover"></canvas>
+                <video id="camera-stream" autoplay playsinline class="w-full h-full object-contain"></video>
+                <canvas id="capture-canvas" class="hidden w-full h-full object-contain"></canvas>
                 <div id="camera-message" class="absolute inset-0 flex items-center justify-center text-white text-center p-4 bg-black/50 z-10">
                     <p class="font-bold flex items-center gap-2">
                         <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -117,7 +117,10 @@
                 </div>
             </div>
 
-            <div class="mt-8 flex justify-center">
+            <div class="mt-8 flex justify-center gap-6">
+                <a href="{{ url('/student/checklist') }}" class="bg-white border-2 border-blue-900 text-blue-900 font-bold text-lg px-12 py-4 rounded-full hover:bg-gray-50 transition transform hover:scale-105 tracking-wide">
+                    BACK
+                </a>
                 <form id="uploadForm" action="{{ url('/student/save-image') }}" method="POST">
                     @csrf 
                     <input type="hidden" name="image_data" id="image-data">
@@ -191,7 +194,8 @@
                     video: {
                         width: { ideal: 1920, max: 4096 },
                         height: { ideal: 1080, max: 2160 },
-                        facingMode: { ideal: "environment" }
+                        facingMode: { ideal: "environment" },
+                        advanced: [{ zoom: 1 }]
                     }
                 };
 
@@ -232,9 +236,9 @@
             try {
                 const formData = new FormData(uploadForm);
                 
-                // Increase browser timeout for this specific heavy request
+                // Increase browser timeout for this specific heavy request (5 Minutes)
                 const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minute timeout
+                const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minute timeout
 
                 const response = await fetch(uploadForm.action, {
                     method: 'POST',
