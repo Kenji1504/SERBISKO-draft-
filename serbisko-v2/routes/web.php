@@ -14,6 +14,8 @@ use App\Http\Middleware\CheckAdmin;
 use App\Http\Controllers\EnrollmentController;
 use Illuminate\Support\Facades\DB;
 
+use App\Http\Controllers\Admin\SectionController;
+
 /*
 |--------------------------------------------------------------------------
 | Public Routes
@@ -23,6 +25,10 @@ Route::get('/', function () {return view('login');})->name('home');
 Route::get('/login', function () {return view('login');})->name('login');
 Route::post('/login', [AuthController::class, 'login']);
 Route::match(['get', 'post'], '/logout', [AuthController::class, 'logout'])->name('logout');
+
+// API for sections (used in student profile)
+Route::get('/admin/api/sections', [SectionController::class, 'getSections'])->name('admin.api.sections');
+
 /*
 |--------------------------------------------------------------------------
 | ADMIN ROUTES (Protected via CheckAdmin)
@@ -41,6 +47,12 @@ Route::middleware([CheckAdmin::class])->group(function () {
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
         Route::get('/students', [StudentController::class, 'students'])->name('students');
         Route::get('/students/profile/{id}', [StudentController::class, 'profilepage'])->name('studentpage.profilepage');
+        
+        // Sections Management
+        Route::get('/sections', [SectionController::class, 'index'])->name('sections.index');
+        Route::post('/sections', [SectionController::class, 'store'])->name('sections.store');
+        Route::delete('/sections/{id}', [SectionController::class, 'destroy'])->name('sections.destroy');
+
         Route::get('/systemsync', [RegistrationSyncController::class, 'systemsync'])->name('systemsync');
         Route::get('/verification', [VerificationController::class, 'verification'])->name('verification');
         Route::get('/accountsettings', [AccessController::class, 'accountsettings'])->name('accountsettings');

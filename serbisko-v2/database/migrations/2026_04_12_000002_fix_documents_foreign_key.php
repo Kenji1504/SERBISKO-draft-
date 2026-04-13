@@ -6,35 +6,32 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
+        // Drop the problematic table
+        Schema::dropIfExists('documents');
+
+        // Recreate it with proper foreign key
         Schema::create('documents', function (Blueprint $table) {
             $table->id();
             
-            // Fixed: Reference students.id instead of LRN to avoid SQLite foreign key mismatch
+            // Reference the primary key ID instead of LRN to avoid SQLite mismatch
             $table->foreignId('student_id')
                 ->constrained('students')
                 ->onDelete('cascade');
 
-            $table->string('document_type'); // e.g., 'Report Card'
-            $table->string('file_path');     // The scanned image
+            $table->string('document_type');
+            $table->string('file_path');
             
-            // OCR & Authentication Fields
-            $table->text('raw_ocr_data')->nullable(); // Extracted text from OCR
-            $table->boolean('is_authenticated')->default(false); // Result from Auxiliary App
-            $table->boolean('is_synced_to_auxiliary')->default(false); // Track the transfer
+            $table->text('raw_ocr_data')->nullable();
+            $table->boolean('is_authenticated')->default(false);
+            $table->boolean('is_synced_to_auxiliary')->default(false);
             
             $table->enum('status', ['Pending', 'Verified', 'Rejected'])->default('Pending');
             $table->timestamps();
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('documents');

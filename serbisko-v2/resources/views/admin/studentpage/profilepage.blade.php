@@ -16,7 +16,27 @@
 
 @section('content')
 {{-- Wrap the entire section in Alpine.js and a Form --}}
-<div x-data="{ editing: false }" class="p-6 font-['Inter'] tracking-normal space-y-4">
+<div x-data="{ 
+    editing: false, 
+    academic_year: '{{ $student->school_year }}',
+    grade_level: '{{ $student->grade_level ?? $finalGrade }}',
+    section_id: '{{ $student->section_id }}',
+    sections: [],
+    async fetchSections() {
+        if (!this.academic_year || !this.grade_level) {
+            this.sections = [];
+            return;
+        }
+        try {
+            const response = await fetch(`/admin/api/sections?academic_year=${this.academic_year}&grade_level=${this.grade_level}`);
+            this.sections = await response.json();
+        } catch (e) {
+            console.error('Failed to fetch sections', e);
+        }
+    }
+}" 
+x-init="fetchSections()"
+class="p-6 font-['Inter'] tracking-normal space-y-4">
 
     @php
         $renderFields = function($fields, $cols = 'md:grid-cols-2', $isJson = false) {
@@ -136,16 +156,87 @@
                 ]) !!}
             </div>
 
-            {{-- Enrolment (Read Only or Sync from JSON) --}}
-            <div class="bg-[#F7FBF9]/40 rounded-xl shadow-md border border-gray-100 p-7">
-                <h2 class="text-[#005288] text-sm font-extrabold mb-4 uppercase">Enrolment</h2>
-                {!! $renderFields([
-                    'School Year:' => $details['School Year'] ?? '—',
-                    'Grade Level to Enroll:' => $finalGrade,    
-                    'Track:'       => $finalTrack,   
-                    'Cluster of Electives:'    => $finalCluster,  
-                    'Academic Status:'      => $finalStatus    
-                ], 'grid-cols-1', true) !!}
+            {{-- Enrolment (Dynamic with Sections) --}}
+            <div class="bg-[#F7FBF9]/60 backdrop-blur-sm rounded-3xl shadow-lg border border-green-100/50 p-8">
+                <div class="flex items-center gap-3 mb-6">
+                    <div class="bg-[#00923F] p-1.5 rounded-lg shadow-sm">
+                        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+                    </div>
+                    <h2 class="text-[#003918] text-sm font-black uppercase tracking-widest">Enrolment</h2>
+                </div>
+                
+                <div class="space-y-6">
+                    <!-- School Year -->
+                    <div class="relative border-b border-gray-100 pb-2 group transition-all duration-200">
+                        <label class="block text-[10px] font-black text-gray-400 mb-1.5 tracking-[0.1em] uppercase">Academic Year</label>
+                        <p x-show="!editing" class="text-[13px] uppercase text-[#003918] min-h-6 font-black tracking-tight">{{ $student->school_year ?: '—' }}</p>
+                        <div x-show="editing" class="relative">
+                            <select name="school_year" x-model="academic_year" @change="fetchSections()"
+                                class="w-full text-[13px] uppercase text-[#005288] bg-[#F1F3F2] border-none rounded-xl py-2 px-4 focus:ring-2 focus:ring-[#00923F] outline-none font-bold appearance-none">
+                                @foreach($academicYears as $ay)
+                                    <option value="{{ $ay }}">{{ $ay }}</option>
+                                @endforeach
+                            </select>
+                            <div class="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[#005288]/50">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7"/></svg>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Grade Level -->
+                    <div class="relative border-b border-gray-100 pb-2 group transition-all duration-200">
+                        <label class="block text-[10px] font-black text-gray-400 mb-1.5 tracking-[0.1em] uppercase">Grade Level</label>
+                        <p x-show="!editing" class="text-[13px] uppercase text-[#003918] min-h-6 font-black tracking-tight">{{ $student->grade_level ?? $finalGrade }}</p>
+                        <div x-show="editing" class="relative">
+                            <select name="grade_level" x-model="grade_level" @change="fetchSections()"
+                                class="w-full text-[13px] uppercase text-[#005288] bg-[#F1F3F2] border-none rounded-xl py-2 px-4 focus:ring-2 focus:ring-[#00923F] outline-none font-bold appearance-none">
+                                <option value="Grade 11">Grade 11</option>
+                                <option value="Grade 12">Grade 12</option>
+                            </select>
+                            <div class="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[#005288]/50">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7"/></svg>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section -->
+                    <div class="relative border-b border-gray-100 pb-2 group transition-all duration-200">
+                        <label class="block text-[10px] font-black text-gray-400 mb-1.5 tracking-[0.1em] uppercase">Section</label>
+                        <p x-show="!editing" class="text-[13px] uppercase text-[#003918] min-h-6 font-black tracking-tight">
+                            {{ $student->section_name ?? '—' }}
+                        </p>
+                        <div x-show="editing" class="relative">
+                            <select name="section_id" x-model="section_id"
+                                class="w-full text-[13px] uppercase text-[#005288] bg-[#F1F3F2] border-none rounded-xl py-2 px-4 focus:ring-2 focus:ring-[#00923F] outline-none font-bold appearance-none">
+                                <option value="">Select Section</option>
+                                <template x-for="section in sections" :key="section.id">
+                                    <option :value="section.id" :selected="section.id == section_id" x-text="section.name"></option>
+                                </template>
+                            </select>
+                            <div class="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[#005288]/50">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7"/></svg>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Track & Cluster (Legacy Sync Data) -->
+                    @php
+                        $syncFields = [
+                            'Track:' => $finalTrack,
+                            'Cluster of Electives:' => $finalCluster,
+                            'Academic Status:' => $finalStatus
+                        ];
+                    @endphp
+                    
+                    <div class="space-y-6 pt-2 border-t border-dashed border-gray-100 mt-2">
+                        @foreach($syncFields as $label => $val)
+                            <div class="relative group transition-all duration-200">
+                                <label class="block text-[9px] font-black text-gray-300 mb-1 tracking-[0.1em] uppercase">{{ $label }}</label>
+                                <p class="text-[12px] uppercase text-gray-400 font-bold tracking-tight italic">{{ $val ?: '—' }}</p>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
             </div>
 
             {{-- Address Section --}}
@@ -203,6 +294,11 @@
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-x-12 gap-y-6">
                         @foreach($dynamicDetails as $question => $answer)
                             @php 
+                                // Skip if the answer is an array (e.g. nested JSON from Google Forms)
+                                if (is_array($answer)) {
+                                    continue;
+                                }
+
                                 // Sanitize the current question/key
                                 $rawName = strtolower(str_replace([':', ' ', "'", '#'], ['', '_', '', 'number'], $question)); 
                             @endphp

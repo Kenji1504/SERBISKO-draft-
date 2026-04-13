@@ -53,6 +53,16 @@
                             <span>Students</span>
                         </a>
                     </li>
+                    <li class="rounded-xl transition-colors group {{ request()->is('admin/sections*') ? 'bg-[#00923F]/10 text-[#00923F] border-l-4 border-[#00923F]' : 'text-[#003918] hover:bg-[#00923F]/5' }}">
+                        <a href="{{ route('admin.sections.index') }}" class="flex items-center gap-10 px-4 py-3 font-semibold">
+                            <div class="w-6 flex justify-center shrink-0">
+                                <svg class="w-5 h-5 fill-current opacity-80 group-hover:opacity-100" viewBox="0 0 20 20">
+                                    <path d="M7 2a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H7zm0 2h6v12H7V4z"/>
+                                </svg>
+                            </div>
+                            <span>Sections</span>
+                        </a>
+                    </li>
                 </ul>
 
                 <li>

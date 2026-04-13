@@ -31,7 +31,7 @@ class AuthController extends Controller
         $query = User::withTrashed()
             ->where('last_name', $request->last_name)
             ->where('first_name', $request->given_name)
-            ->where('birthday', $request->dob);
+            ->whereDate('birthday', $request->dob);
 
         if ($request->filled('middle_name')) {
             $query->where('middle_name', $request->middle_name);
@@ -49,7 +49,7 @@ class AuthController extends Controller
             $partialMatch = User::withTrashed() 
                 ->where('last_name', $request->last_name)
                 ->where('first_name', $request->given_name)
-                ->where('birthday', $request->dob)
+                ->whereDate('birthday', $request->dob)
                 ->exists();
 
             if ($partialMatch) {

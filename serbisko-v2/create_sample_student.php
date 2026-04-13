@@ -30,6 +30,7 @@ DB::table('students')->updateOrInsert(
     ['lrn' => '006346555172'],
     [
         'user_id' => $userId,
+        'school_year' => '2025-2026',
         'sex' => 'Male',
         'age' => 18,
         'place_of_birth' => 'Mexico, Pampanga',
@@ -64,8 +65,10 @@ DB::table('students')->updateOrInsert(
     ]
 );
 
+$student = DB::table('students')->where('lrn', '006346555172')->first();
+
 DB::table('pre_enrollments')->updateOrInsert(
-    ['student_lrn' => '006346555172'],
+    ['student_id' => $student->id],
     [
         'responses' => json_encode([
             'lrn' => '006346555172',
