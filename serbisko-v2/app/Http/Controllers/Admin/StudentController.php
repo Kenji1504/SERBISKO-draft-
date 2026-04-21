@@ -102,7 +102,13 @@ class StudentController extends Controller
         }
 
         $students = $query->get()->map(function($student) {
-            $raw = json_decode($student->responses, true) ?? [];
+            $raw = $student->responses;
+            if (is_string($raw)) {
+                $raw = json_decode($raw, true) ?? [];
+            } else {
+                $raw = $raw ?? [];
+            }
+            
             $details = [];
             // This helps catch keys even with accidental leading/trailing spaces
             foreach ($raw as $key => $value) {
@@ -161,31 +167,24 @@ class StudentController extends Controller
     // 3. STUDENT PROFILE LOGIC
     public function profilepage($id)
     {
-        // 1. Fetch the student - Using lrn as the identifier ($id)
-        $student = DB::table('students')
-            ->join('users', 'students.user_id', '=', 'users.id')
-            ->leftJoin('pre_enrollments', 'students.id', '=', 'pre_enrollments.student_id')
-            ->leftJoin('kiosk_enrollments', 'students.id', '=', 'kiosk_enrollments.student_id') 
-            ->leftJoin('sections', 'students.section_id', '=', 'sections.id')
-            ->select([
-                'students.lrn as id', // Alias for consistency
-                'students.*', 
-                'sections.name as section_name',
-                'users.first_name', 'users.last_name', 'users.extension_name', 'users.middle_name', 'users.birthday', 
-                'pre_enrollments.responses',
-                'kiosk_enrollments.grade_level as kiosk_grade', 
-                'kiosk_enrollments.track as kiosk_track',
-                'kiosk_enrollments.cluster as kiosk_cluster', 
-                'kiosk_enrollments.academic_status as kiosk_status'
-            ])
-            ->where('students.lrn', $id)
-            ->whereNull('users.deleted_at')
+        // 1. Fetch Student with Relations - Using lrn as the identifier ($id)
+        $student = Student::with(['section', 'user', 'latestSubmission'])
+            ->where('lrn', $id)
             ->first();
 
         if (!$student) abort(404);
 
-        // 2. JSON Parsing & Key Normalization
-        $rawDetails = json_decode($student->responses, true) ?: [];
+        // Ensure user exists
+        if (!$student->user || $student->user->deleted_at) abort(404);
+
+        // 2. Data Normalization
+        $rawDetails = $student->latestSubmission ? ($student->latestSubmission->responses ?? []) : [];
+        
+        // Ensure it's an array (in case casting didn't happen for some reason)
+        if (is_string($rawDetails)) {
+            $rawDetails = json_decode($rawDetails, true) ?: [];
+        }
+
         $details = [];
         foreach ($rawDetails as $key => $value) {
             $details[strtolower(trim($key))] = $value;
@@ -201,10 +200,22 @@ class StudentController extends Controller
             return null;
         };
 
-        $finalGrade   = $student->kiosk_grade   ?? ($getMappedValue(['Grade Level to Enroll', 'grade']) ?? '—');
-        $finalTrack   = $student->kiosk_track   ?? ($getMappedValue(['Track']) ?? '—');
-        $finalStatus  = $student->kiosk_status  ?? ($getMappedValue(['Academic Status']) ?? '—');
-        $finalCluster = $student->kiosk_cluster ?? ($getMappedValue(['Cluster of Electives', 'cluster', 'elective cluster']) ?? '—');
+        // Kiosk data fallback
+        $kiosk = DB::table('kiosk_enrollments')->where('student_id', $student->id)->first();
+
+        $finalGrade   = ($kiosk ? $kiosk->grade_level : null) ?? ($student->grade_level ?? ($getMappedValue(['Grade Level to Enroll', 'grade']) ?? '—'));
+        $finalTrack   = ($kiosk ? $kiosk->track : null)       ?? ($getMappedValue(['Track']) ?? '—');
+        $finalStatus  = ($kiosk ? $kiosk->academic_status : null) ?? ($getMappedValue(['Academic Status']) ?? '—');
+        $finalCluster = ($kiosk ? $kiosk->cluster : null)     ?? ($getMappedValue(['Cluster of Electives', 'cluster', 'elective cluster']) ?? '—');
+
+        // Map section name to student object for Blade compatibility
+        $student->section_name = $student->section ? $student->section->name : '—';
+        // Map user properties directly for existing Blade code
+        $student->first_name = $student->user->first_name;
+        $student->last_name = $student->user->last_name;
+        $student->middle_name = $student->user->middle_name;
+        $student->extension_name = $student->user->extension_name;
+        $student->birthday = $student->user->birthday;
 
         $fixedKeys = [
             'first name', 'given name', 'fname', 'pangalan', 'last name', 'surname', 'family name', 'apelyido',
@@ -245,6 +256,8 @@ class StudentController extends Controller
     // 4. STUDENT PROFILE UPDATE LOGIC
     public function updateStudentProfile(Request $request, $id)
     {
+        \Illuminate\Support\Facades\Log::info("Update Attempt for LRN: $id", $request->all());
+
         // 1. Basic Validation
         $request->validate([
             'first_name' => 'required|string|max:255',
@@ -254,7 +267,10 @@ class StudentController extends Controller
         DB::beginTransaction();
         try {
             $student = DB::table('students')->where('lrn', $id)->first();
-            if (!$student) throw new \Exception("Student record not found.");
+            if (!$student) {
+                \Illuminate\Support\Facades\Log::error("Student not found for LRN: $id");
+                throw new \Exception("Student record not found.");
+            }
 
             // 2. Update Master Identity (Users Table)
             DB::table('users')->where('id', $student->user_id)->update([
@@ -277,6 +293,11 @@ class StudentController extends Controller
                 'grade_level', 'section_id'
             ]);
 
+            // Normalize section_id: if it's empty or zero, set it to null
+            if (empty($studentFields['section_id'])) {
+                $studentFields['section_id'] = null;
+            }
+
             $studentFields['school_year'] = $request->school_year;
             $studentFields['is_manually_edited'] = 1;
             $studentFields['updated_at'] = now();
@@ -292,7 +313,13 @@ class StudentController extends Controller
                     ->first();
 
                 if ($preEnrollment) {
-                    $currentResponses = json_decode($preEnrollment->responses, true) ?? [];
+                    $currentResponses = $preEnrollment->responses;
+                    if (is_string($currentResponses)) {
+                        $currentResponses = json_decode($currentResponses, true) ?? [];
+                    } else {
+                        $currentResponses = $currentResponses ?? [];
+                    }
+                    
                     $updatedResponses = array_merge($currentResponses, $request->responses);
 
                     DB::table('pre_enrollments')

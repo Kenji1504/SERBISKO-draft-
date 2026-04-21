@@ -103,7 +103,7 @@
                                 <div class="absolute left-4 top-1/2 -translate-y-1/2 text-[11px] font-black text-gray-500" x-text="i"></div>
                                 <input type="text" name="section_names[]" required
                                     :placeholder="'Enter name for section ' + i"
-                                    class="w-full bg-[#F1F3F2] border-none rounded-xl py-3.5 pl-10 pr-5 focus:ring-2 focus:ring-[#005288] outline-none text-sm text-[#003918] font-black uppercase shadow-sm transition-all placeholder-gray-400">
+                                    class="w-full bg-[#F1F3F2] border-none rounded-xl py-3.5 pl-10 pr-5 focus:ring-2 focus:ring-[#005288] outline-none text-sm text-[#003918] font-black shadow-sm transition-all placeholder-gray-400">
                             </div>
                         </template>
                     </div>
