@@ -23,6 +23,15 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Nested projects and backups
+/serbisko-v2
+/ssfile
+
+# Python
+__pycache__/
+*.pyc
+
 # SerbIsko Bridge Secrets
 bridge/.env
 bridge/serviceAccountKey.json
